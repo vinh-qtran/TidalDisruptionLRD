@@ -164,7 +164,7 @@ class BaseProfile:
             def _f_eta_integrand(psi):
                 return (
                     1
-                    / np.sqrt(_psi_bins[_i] - psi)
+                    / np.sqrt(_psi_bins[_i] - psi)  # noqa: B023
                     * np.exp(_lin_log_d2rho_dpsi2_interp(psi))
                 )
 

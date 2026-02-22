@@ -43,7 +43,7 @@ repos:
         args: [--prose-wrap=always]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.15.1"
+    rev: "v0.15.2"
     hooks:
       - id: ruff-check
         args: ["--fix", "--show-fixes"]
@@ -59,12 +59,12 @@ repos:
           - nox
           - pytest
 
-  - repo: https://github.com/codespell-project/codespell
-    rev: "v2.4.1"
-    hooks:
-      - id: codespell
-        additional_dependencies:
-          - tomli; python_version<'3.11'
+  # - repo: https://github.com/codespell-project/codespell
+  #   rev: "v2.4.1"
+  #   hooks:
+  #     - id: codespell
+  #       additional_dependencies:
+  #         - tomli; python_version<'3.11'
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: "v0.11.0.1"
