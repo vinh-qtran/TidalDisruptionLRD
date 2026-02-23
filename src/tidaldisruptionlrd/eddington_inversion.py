@@ -7,7 +7,7 @@ from tidaldisruptionlrd.utils import get_interp
 
 
 class BaseProfile:
-    def __init__(self, r_bin_min, r_bin_max, N_bins, M_bh=0):
+    def __init__(self, r_bin_min, r_bin_max, N_bins, M_bh=0, r_zero_phi=None):
         """
         Initialize the base profile class.
 
@@ -22,6 +22,8 @@ class BaseProfile:
 
         M_bh: float, optional
             Mass of the central black hole in M_sun. Default is 0.
+        r_zero_phi: float, optional
+            Radius at which the stellar potential is set to zero in kpc. Default is None, which means the potential is set to zero at the maximum radius.
         """
 
         self._r_bin_min = r_bin_min
@@ -30,6 +32,8 @@ class BaseProfile:
         self._N_bins = N_bins
 
         self.M_bh = M_bh
+
+        self._r_zero_phi = r_zero_phi or r_bin_max
 
         (
             self.r_bins,
@@ -99,7 +103,9 @@ class BaseProfile:
         _delta_phi_integrand = G * stellar_mass_bins / r_bins**2
         _delta_phi_bins = cumulative_trapezoid(_delta_phi_integrand, r_bins, initial=0)
 
-        return _delta_phi_bins - _delta_phi_bins[-1]
+        _zero_phi_ind = np.argmin(np.abs(r_bins - self._r_zero_phi))
+
+        return _delta_phi_bins - _delta_phi_bins[_zero_phi_ind]
 
     def _get_Eddington_bins(self, rho_bins, phi_bins):
         """
@@ -147,7 +153,7 @@ class BaseProfile:
             _f_eta_bins.append(
                 quad(
                     _f_eta_integrand,
-                    0,
+                    np.min(_psi_bins),
                     _psi_bins[_i],
                 )[0]
             )
@@ -219,9 +225,12 @@ class BaseProfile:
             return 4 * np.pi * v**2 * np.exp(_lin_log_eddington_interp(psi - v**2 / 2))
 
         _reconstructed_rho_bins = []
-        for phi in tqdm(self.phi_bins, desc="Reconstructing densities"):
+        _max_phi = np.max(self.phi_bins)
+        for _phi in tqdm(self.phi_bins, desc="Reconstructing densities"):
             _reconstructed_rho_bins.append(  # noqa: PERF401
-                quad(_rho_integrand, 0, np.sqrt(-2 * phi), args=(-phi,))[0]
+                quad(_rho_integrand, 0, np.sqrt(2 * (_max_phi - _phi)), args=(-_phi,))[
+                    0
+                ]
             )
 
         return np.array(_reconstructed_rho_bins)
