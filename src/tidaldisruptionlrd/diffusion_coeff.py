@@ -2,12 +2,22 @@ import numpy as np
 from scipy.integrate import cumulative_trapezoid, quad
 from tqdm import tqdm
 
+from tidaldisruptionlrd.constants import G
 from tidaldisruptionlrd.utils import get_interp
 
 
 class DiffusionCoefficient:
     def __init__(
-        self, r_bins, phi_bins, eta_bins, f_eta_bins, reduce_factor=10, N_bins=1000
+        self,
+        r_bins,
+        stellar_mass_bins,
+        M_bh,
+        phi_bins,
+        eta_bins,
+        f_eta_bins,
+        reduce_factor=10,
+        N_bins=1000,
+        G=G,
     ):
         """
         Initialize the diffusion coefficient class.
@@ -16,6 +26,10 @@ class DiffusionCoefficient:
         ----------
         r_bins: array
             Array of radius bins in kpc.
+        stellar_mass_bins: array
+            Array of stellar mass bins in M_sun.
+        M_bh: float
+            Black hole mass in M_sun.
         phi_bins: array
             Array of potential bins in (km/s)^2.
         eta_bins: array
@@ -27,14 +41,22 @@ class DiffusionCoefficient:
             Factor by which to reduce the number of bins for the diffusion coefficient calculation. Default is 10.
         N_bins: int, optional
             Number of bins to use for the diffusion coefficient calculation. Default is 1000.
+
+        G: float, optional
+            Gravitational constant in kpc^3 / (M_sun * Gyr^2). Default is G from tidaldisruptionlrd.constants.
         """
 
         self._reduce_factor = reduce_factor
+        self._G = G
 
         self.r_bins = self._reduce_bins(r_bins)
+        self.mass_bins = self._reduce_bins(stellar_mass_bins + M_bh)
+        self.M_bh = M_bh
         self.psi_bins = -self._reduce_bins(phi_bins)
         self.eta_bins = self._reduce_bins(eta_bins)
         self.f_eta_bins = self._reduce_bins(f_eta_bins)
+
+        self.Jc_sqr_bins = self._get_Jc_sqr_bins()
 
         self._N_bins = N_bins
 
@@ -65,40 +87,44 @@ class DiffusionCoefficient:
 
         Returns:
         -------
-        log_log_r_interp: CubicSpline
-            Interpolated profile of the (log) radius as a function of (log) negative potential.
+        lin_log_r_interp: CubicSpline
+            Interpolated profile of the (log) radius as a function of negative potential.
         log_log_neg_dr_dpsi_interp: CubicSpline
-            Interpolated profile of the (negative log) derivative of radius with respect to negative potential as a function of (log) negative potential
+            Interpolated profile of the (negative log) derivative of radius with respect to negative potential as a function of negative potential
         """
 
-        log_log_r_interp = get_interp(np.log(self.psi_bins), np.log(self.r_bins))
+        lin_log_r_interp = get_interp(self.psi_bins, np.log(self.r_bins))
 
-        _dlnr_dlnpsi_bins = np.gradient(np.log(self.r_bins), np.log(self.psi_bins))
+        _dlnr_dpsi_bins = np.gradient(np.log(self.r_bins), self.psi_bins)
 
-        log_log_neg_dr_dpsi_interp = get_interp(
-            np.log(self.psi_bins),
-            np.log(-self.r_bins / self.psi_bins * _dlnr_dlnpsi_bins),
+        lin_log_neg_dr_dpsi_interp = get_interp(
+            self.psi_bins,
+            np.log(-self.r_bins * _dlnr_dpsi_bins),
         )
 
-        return log_log_r_interp, log_log_neg_dr_dpsi_interp
+        return lin_log_r_interp, lin_log_neg_dr_dpsi_interp
 
-    def _get_Jc_sqr_interp(self):
+    def _get_Jc_sqr_bins(self):
         """
-        Get the interpolated profile of the circular angular momentum squared as a function of eta.
+        Get the square angular momentum of a circular orbit bins.
 
         Returns:
         -------
-        log_log_Jc_sqr_interp: CubicSpline
-            Interpolated profile of the (log) circular angular momentum squared as a function of (log) eta.
+        Jc_sqr_bins: array
+            Array of Jc square bins in (kpc * km/s)^2.
         """
-        _orbit_eta_bins = self.psi_bins / 2
-        _orbit_Jc_sqr_bins = self.psi_bins * self.r_bins**2
+        _orbit_Vc_bins = np.sqrt(self._G * self.mass_bins / self.r_bins)
 
-        return get_interp(np.log(_orbit_eta_bins), np.log(_orbit_Jc_sqr_bins))
+        _orbit_eta_bins = self.psi_bins - 0.5 * _orbit_Vc_bins**2
+        _orbit_Jc_sqr_bins = self.r_bins**2 * _orbit_Vc_bins**2
 
-    def _get_f_eta_interp(self):
+        _lin_log_Jc_sqr_interp = get_interp(_orbit_eta_bins, np.log(_orbit_Jc_sqr_bins))
+
+        return np.exp(_lin_log_Jc_sqr_interp(self.eta_bins))
+
+    def _get_lin_log_f_eta_interp(self):
         """
-        Get the interpolated profile of the distribution function as a function of eta.
+        Get the interpolated profile of the (log) distribution function as a function of eta.
 
         Returns:
         -------
@@ -130,9 +156,8 @@ class DiffusionCoefficient:
             Array of scaled orbit-averaged diffusion coefficient bins in (km/s)^2.
         """
 
-        _log_log_r_interp, _log_log_neg_dr_dpsi_interp = self._get_r_interps()
-        _log_log_Jc_sqr_interp = self._get_Jc_sqr_interp()
-        _lin_log_f_eta_interp = self._get_f_eta_interp()
+        _lin_log_r_interp, _lin_log_neg_dr_dpsi_interp = self._get_r_interps()
+        _lin_log_f_eta_interp = self._get_lin_log_f_eta_interp()
 
         _I0_bins = self._get_I0_bins()
 
@@ -148,8 +173,8 @@ class DiffusionCoefficient:
             _eta = self.eta_bins[i]
 
             def _w_bar_integrand(psi):
-                _r = np.exp(_log_log_r_interp(np.log(psi)))
-                _dr_dpsi = -np.exp(_log_log_neg_dr_dpsi_interp(np.log(psi)))
+                _r = np.exp(_lin_log_r_interp(psi))
+                _dr_dpsi = -np.exp(_lin_log_neg_dr_dpsi_interp(psi))
 
                 _eta_prime_bins = np.linspace(_eta, psi, self._N_bins)  # noqa: B023
                 _I_1 = (2 * (psi - _eta)) ** (-1 / 2) * np.trapezoid(  # noqa: B023
@@ -167,7 +192,7 @@ class DiffusionCoefficient:
 
             scaled_diff_coeff_bins.append(
                 1
-                / np.exp(_log_log_Jc_sqr_interp(np.log(_eta)))
+                / self.Jc_sqr_bins[i]
                 * quad(
                     _w_bar_integrand,
                     np.max(self.psi_bins),

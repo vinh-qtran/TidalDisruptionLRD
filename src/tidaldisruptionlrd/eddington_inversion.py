@@ -7,7 +7,7 @@ from tidaldisruptionlrd.utils import get_interp
 
 
 class BaseProfile:
-    def __init__(self, r_bin_min, r_bin_max, N_bins, M_bh=0, r_zero_phi=None):
+    def __init__(self, r_bin_min, r_bin_max, N_bins, M_bh=0, G=G, r_zero_phi=None):
         """
         Initialize the base profile class.
 
@@ -22,6 +22,8 @@ class BaseProfile:
 
         M_bh: float, optional
             Mass of the central black hole in M_sun. Default is 0.
+        G: float, optional
+            Gravitational constant in kpc^3 / (M_sun * Gyr^2). Default is G from tidaldisruptionlrd.constants.
         r_zero_phi: float, optional
             Radius at which the stellar potential is set to zero in kpc. Default is None, which means the potential is set to zero at the maximum radius.
         """
@@ -32,7 +34,7 @@ class BaseProfile:
         self._N_bins = N_bins
 
         self.M_bh = M_bh
-
+        self._G = G
         self._r_zero_phi = r_zero_phi or r_bin_max
 
         (
@@ -100,7 +102,7 @@ class BaseProfile:
             Array of potential bins in (km/s)^2.
         """
 
-        _delta_phi_integrand = G * stellar_mass_bins / r_bins**2
+        _delta_phi_integrand = self._G * stellar_mass_bins / r_bins**2
         _delta_phi_bins = cumulative_trapezoid(_delta_phi_integrand, r_bins, initial=0)
 
         _zero_phi_ind = np.argmin(np.abs(r_bins - self._r_zero_phi))
@@ -195,7 +197,7 @@ class BaseProfile:
         stellar_mass_bins = self._get_stellar_mass_bins(r_bins, stellar_rho_bins)
         stellar_phi_bins = self._get_stellar_phi_bins(r_bins, stellar_mass_bins)
 
-        phi_bins = stellar_phi_bins - G * self.M_bh / r_bins
+        phi_bins = stellar_phi_bins - self._G * self.M_bh / r_bins
 
         eta_bins, f_eta_bins = self._get_Eddington_bins(stellar_rho_bins, phi_bins)
 
