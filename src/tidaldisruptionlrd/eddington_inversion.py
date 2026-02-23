@@ -1,9 +1,9 @@
 import numpy as np
 from scipy.integrate import cumulative_trapezoid, quad
-from scipy.interpolate import CubicSpline
 from tqdm import tqdm
 
 from tidaldisruptionlrd.constants import G
+from tidaldisruptionlrd.utils import get_interp
 
 
 class BaseProfile:
@@ -19,6 +19,9 @@ class BaseProfile:
             Maximum profile radius of the halo in kpc.
         N_bins: int
             Number of bins to use for the profiles.
+
+        M_bh: float, optional
+            Mass of the central black hole in M_sun. Default is 0.
         """
 
         self._r_bin_min = r_bin_min
@@ -37,33 +40,6 @@ class BaseProfile:
             self.eta_bins,
             self.f_eta_bins,
         ) = self._get_profiles()
-
-    def _get_interp(self, x_bins, y_bins):
-        """
-        Get the interpolated profiles of the halo.
-
-        Parameters:
-        ----------
-        x_bins: array
-            Array of the x-param.
-        y_bins: array
-            Array of the y-param.
-
-        Returns:
-        -------
-        interp: CubicSpline
-            Interpolated profile of the halo.
-        """
-
-        x_order = np.argsort(x_bins)
-        x_increasing_mask = np.append([True], np.diff(x_bins[x_order]) > 0)
-
-        x_bins = x_bins[x_order][x_increasing_mask]
-        y_bins = y_bins[x_order][x_increasing_mask]
-
-        finite_mask = np.logical_and(np.isfinite(x_bins), np.isfinite(y_bins))
-
-        return CubicSpline(x_bins[finite_mask], y_bins[finite_mask])
 
     def _get_stellar_rho_bins(self, r_bins):
         """
@@ -153,7 +129,7 @@ class BaseProfile:
             )
         )
 
-        _lin_log_d2rho_dpsi2_interp = self._get_interp(
+        _lin_log_d2rho_dpsi2_interp = get_interp(
             _psi_bins[1:], np.log(_d2rho_dpsi2_bins[1:])
         )
 
@@ -237,9 +213,7 @@ class BaseProfile:
             Array of reconstructed density bins in M_sun / kpc^3.
         """
 
-        _lin_log_eddington_interp = self._get_interp(
-            self.eta_bins, np.log(self.f_eta_bins)
-        )
+        _lin_log_eddington_interp = get_interp(self.eta_bins, np.log(self.f_eta_bins))
 
         def _rho_integrand(v, psi):
             return 4 * np.pi * v**2 * np.exp(_lin_log_eddington_interp(psi - v**2 / 2))
