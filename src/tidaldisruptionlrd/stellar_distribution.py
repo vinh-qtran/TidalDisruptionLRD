@@ -1,8 +1,13 @@
+import warnings
+
 import numpy as np
-from scipy.integrate import cumulative_trapezoid, quad
+from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
 from tqdm import tqdm
 
-from tidaldisruptionlrd.utils import get_interp
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=IntegrationWarning)
+
+from tidaldisruptionlrd.utils import get_interp  # noqa: E402
 
 
 class BaseProfile:
@@ -284,9 +289,9 @@ class BaseProfile:
 
         return np.exp(_log_log_Jc_sqr_interp(np.log(epsilon_bins)))
 
-    def _get_h_epsilon_interps(self):
+    def _get_r_interps(self):
         """
-        Get the interpolators for the h bins calculation.
+        Get the interpolators for the r bins-related calculation.
 
         Returns:
         -------
@@ -294,46 +299,56 @@ class BaseProfile:
             Interpolator for (natural log) r^2 as a function of (natural log) psi.
         log_log_neg_dr_dpsi_interp: function
             Interpolator for (natural log) - dr / dpsi as a function of (natural log) psi.
+        """
+
+        log_log_r_sqr_interp = get_interp(
+            np.log(-self.phi_bins), 2 * np.log(self.r_bins)
+        )
+
+        _dr_dpsi_bins = (
+            self.r_bins
+            / (-self.phi_bins)
+            * np.gradient(np.log(self.r_bins), np.log(-self.phi_bins))
+        )
+
+        log_log_neg_dr_dpsi_interp = get_interp(
+            np.log(-self.phi_bins),
+            np.log(-_dr_dpsi_bins),
+        )
+
+        return (log_log_r_sqr_interp, log_log_neg_dr_dpsi_interp)
+
+    def _get_epsilon_interps(self):
+        """
+        Get the interpolators for epsilon functions.
+
+        Returns:
+        -------
         log_log_g_epsilon_interp: function
             Interpolator for (natural log) g as a function of (natural log) epsilon.
         log_log_I_0_bar_interp: function
             Interpolator for (natural log) I_0_bar as a function of (natural log) epsilon.
         """
 
-        _log_log_r_sqr_interp = get_interp(
-            np.log(-self.phi_bins), 2 * np.log(self.r_bins)
-        )
-
-        _log_log_neg_dr_dpsi_interp = get_interp(
-            np.log(-self.phi_bins),
-            np.log(
-                -self.r_bins
-                / (-self.phi_bins)
-                * np.gradient(np.log(self.r_bins), np.log(-self.phi_bins))
-            ),
-        )
-
-        _log_log_g_epsilon_interp = get_interp(
+        log_log_g_epsilon_interp = get_interp(
             np.log(self.epsilon_bins), np.log(self.g_epsilon_bins)
         )
 
         _I_0_bar_bins = cumulative_trapezoid(
             self.g_epsilon_bins, self.epsilon_bins, initial=0
         )
-        _log_log_I_0_bar_interp = get_interp(
+        log_log_I_0_bar_interp = get_interp(
             np.log(self.epsilon_bins), np.log(_I_0_bar_bins)
         )
 
         return (
-            _log_log_r_sqr_interp,
-            _log_log_neg_dr_dpsi_interp,
-            _log_log_g_epsilon_interp,
-            _log_log_I_0_bar_interp,
+            log_log_g_epsilon_interp,
+            log_log_I_0_bar_interp,
         )
 
     def _get_h_epsilon_bins(self, epsilon_bins, max_psi):
         """
-        Get the h bins for the loss cone profiles calculation.
+        Get the h bins for the loss cone calculation.
 
         Parameters:
         ----------
@@ -351,9 +366,12 @@ class BaseProfile:
         (
             _log_log_r_sqr_interp,
             _log_log_neg_dr_dpsi_interp,
+        ) = self._get_r_interps()
+
+        (
             _log_log_g_epsilon_interp,
             _log_log_I_0_bar_interp,
-        ) = self._get_h_epsilon_interps()
+        ) = self._get_epsilon_interps()
 
         def _I_n_bar_integrand(epsilon_prime, psi, n):
             return (psi - epsilon_prime) ** (n / 2) * np.exp(
@@ -361,12 +379,12 @@ class BaseProfile:
             )
 
         h_bins = []
-        for i in tqdm(range(self._N_reduced_bins), desc="Calculating h(eps)"):
+        for i in tqdm(range(len(epsilon_bins)), desc="Calculating h(eps)"):
             _epsilon = epsilon_bins[i]
 
             def _h_integrand(psi):
                 _r_sqr = np.exp(_log_log_r_sqr_interp(np.log(psi)))
-                _dr_dpsi = -np.exp(_log_log_neg_dr_dpsi_interp(np.log(psi)))
+                _neg_dr_dpsi = np.exp(_log_log_neg_dr_dpsi_interp(np.log(psi)))
 
                 _epsilon_prime_bins = np.linspace(_epsilon, psi, self._N_trapz_bins)  # noqa: B023
                 _I_1_bar = np.trapezoid(
@@ -379,7 +397,7 @@ class BaseProfile:
 
                 return (
                     _r_sqr
-                    * _dr_dpsi
+                    * _neg_dr_dpsi
                     * (
                         3 * (psi - _epsilon) ** (-1) * _I_1_bar  # noqa: B023
                         - (psi - _epsilon) ** (-2) * _I_3_bar  # noqa: B023
@@ -387,7 +405,7 @@ class BaseProfile:
                     )
                 )
 
-            h_bins.append(quad(_h_integrand, max_psi, _epsilon)[0])
+            h_bins.append(quad(_h_integrand, _epsilon, max_psi)[0])
 
         return np.array(h_bins)
 

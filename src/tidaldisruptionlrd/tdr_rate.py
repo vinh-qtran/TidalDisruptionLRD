@@ -11,6 +11,7 @@ class TDRRate:
         g_ast_bins,
         h_ast_bins,
         Jc_sqr_ast_bins,
+        # P_ast_bins,
         M_bh,
         sigma,
         m_s,
@@ -30,6 +31,8 @@ class TDRRate:
             Array of h_ast bins.
         Jc_sqr_ast_bins: array
             Array of Jc_sqr_ast bins.
+        #P_ast_bins: array
+        #    Array of P_ast bins.
 
         M_bh: array or float
             Black hole mass in M_sun.
@@ -48,6 +51,7 @@ class TDRRate:
         self._g_ast_bins = g_ast_bins
         self._h_ast_bins = h_ast_bins
         self._Jc_sqr_ast_bins = Jc_sqr_ast_bins
+        # self._P_ast_bins = P_ast_bins
 
         self.M_bh = M_bh
         self.sigma = sigma
@@ -150,7 +154,9 @@ class TDRRate:
 
         _scaler = 256 * np.pi**4 / 3 / np.sqrt(2) * np.log(0.4 / m_s_ast)
 
-        return _scaler / (-ln_R0_bins) * self._g_ast_bins * self._h_ast_bins
+        return (
+            _scaler / (-ln_R0_bins) * self._g_ast_bins * self._h_ast_bins
+        )  # / self._P_ast_bins
 
     def _get_single_N_rate_ast(self, m_s_ast, r_t_ast):
         """
