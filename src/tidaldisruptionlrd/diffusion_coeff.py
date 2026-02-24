@@ -10,8 +10,7 @@ class DiffusionCoefficient:
     def __init__(
         self,
         r_bins,
-        stellar_mass_bins,
-        M_bh,
+        mass_bins,
         phi_bins,
         eta_bins,
         f_eta_bins,
@@ -26,10 +25,8 @@ class DiffusionCoefficient:
         ----------
         r_bins: array
             Array of radius bins in kpc.
-        stellar_mass_bins: array
-            Array of stellar mass bins in M_sun.
-        M_bh: float
-            Black hole mass in M_sun.
+        mass_bins: array
+            Array of mass bins in M_sun.
         phi_bins: array
             Array of potential bins in (km/s)^2.
         eta_bins: array
@@ -50,8 +47,7 @@ class DiffusionCoefficient:
         self._G = G
 
         self.r_bins = self._reduce_bins(r_bins)
-        self.mass_bins = self._reduce_bins(stellar_mass_bins + M_bh)
-        self.M_bh = M_bh
+        self.mass_bins = self._reduce_bins(mass_bins)
         self.psi_bins = -self._reduce_bins(phi_bins)
         self.eta_bins = self._reduce_bins(eta_bins)
         self.f_eta_bins = self._reduce_bins(f_eta_bins)
@@ -188,12 +184,10 @@ class DiffusionCoefficient:
                     3 * _I_1 - _I_3 + 2 * _I0_bins[i]  # noqa: B023
                 )
 
-                return 2 * _dr_dpsi * (2 * (psi - _eta)) ** (-1 / 2) * _w_integrand  # noqa: B023
+                return _dr_dpsi * (psi - _eta) ** (-1 / 2) * _w_integrand  # noqa: B023
 
             scaled_diff_coeff_bins.append(
-                1
-                / self.Jc_sqr_bins[i]
-                * quad(
+                quad(
                     _w_bar_integrand,
                     np.max(self.psi_bins),
                     _eta,
