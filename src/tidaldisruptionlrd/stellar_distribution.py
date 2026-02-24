@@ -6,7 +6,14 @@ from tidaldisruptionlrd.utils import get_interp
 
 
 class BaseProfile:
-    def __init__(self, r_bin_min, r_bin_max, N_bins):
+    def __init__(
+        self,
+        r_bin_min=1e-4,
+        r_bin_max=1e4,
+        N_bins=10000,
+        reduce_factor=10,
+        N_trapz_bins=1000,
+    ):
         """
         Initialize the base profile class. The profile is defined in scale parameters,
         with the scale mass being the mass of the central black hole and the scale length
@@ -16,21 +23,33 @@ class BaseProfile:
 
         Parameters:
         ----------
-        r_bin_min: float
-            Minimum profile radius of the halo in scale_length.
-        r_bin_max: float
-            Maximum profile radius of the halo in scale_length.
-        N_bins: int
-            Number of bins to use for the profiles.
+        r_bin_min: float, optional
+            Minimum profile radius of the halo in scale_length. Default is 1e-4.
+        r_bin_max: float, optional
+            Maximum profile radius of the halo in scale_length. Default is 1e4.
+        N_bins: int, optional
+            Number of bins to use for the profiles. Default is 10000.
+
+        reduce_factor: int, optional
+            Factor by which to reduce the number of bins for the loss cone calculations. Default is 10.
+        N_trapz_bins: int, optional
+            Number of bins to use for the trapezoidal integration in the loss cone calculations. Default is 1000.
         """
 
         self._r_bin_min = r_bin_min
         self._r_bin_max = r_bin_max
-
         self._N_bins = N_bins
 
-        self._get_profiles()
+        self._reduce_factor = reduce_factor
+        self._N_reduced_bins = self._N_bins // self._reduce_factor
 
+        self._N_trapz_bins = N_trapz_bins
+
+        self._get_base_profiles()
+
+        self._get_reduced_profiles()
+
+    # BASE PROFILES CALCULATIONS
     def _get_stellar_rho_bins(self, r_bins):
         """
         Get the stellar density profile of the halo.
@@ -134,7 +153,7 @@ class BaseProfile:
 
         _epsilon_bins = _psi_bins
         _g_epsilon_bins = [0]
-        for i in tqdm(range(1, self._N_bins), desc="Eddington's inversion"):
+        for i in tqdm(range(1, self._N_bins), desc="Calculating g(eps)"):
 
             def _g_epsilon_integrand(psi):
                 return (
@@ -153,9 +172,9 @@ class BaseProfile:
 
         return _epsilon_bins, 1 / np.sqrt(8) / np.pi**2 * np.array(_g_epsilon_bins)
 
-    def _get_profiles(self):
+    def _get_base_profiles(self):
         """
-        Get the profiles of the halo.
+        Get the base profiles of the halo.
 
         Set Attributes:
         -------
@@ -199,6 +218,7 @@ class BaseProfile:
             self.stellar_rho_bins, self.phi_bins
         )
 
+    # SELF-CONSISTENCY CHECKS
     def reconstruct_stellar_rho_bins(self, psi_bins, epsilon_bins, g_epsilon_bins):
         """
         Reconstruct the density profile from the potential and Eddington distribution.
@@ -238,77 +258,17 @@ class BaseProfile:
 
         return np.array(_reconstructed_rho_bins)
 
-
-class BaseLossCone(BaseProfile):
-    def __init__(
-        self,
-        r_bin_min=1e-4,
-        r_bin_max=1e4,
-        N_bins=10000,
-        reduce_factor=10,
-        N_trapz_bins=1000,
-    ):
-        """
-        Initialize the base loss cone class. The loss cone profiles are defined in scale
-        parameters as in the case of the base profile class.
-
-        Parameters:
-        ----------
-        r_bin_min: float, optional
-            Minimum profile radius of the halo in scale_length. Default is 1e-4.
-        r_bin_max: float, optional
-            Maximum profile radius of the halo in scale_length. Default is 1e4.
-        N_bins: int, optional
-            Number of bins to use for the profiles. Default is 10000.
-
-        reduce_factor: int, optional
-            Factor by which to reduce the number of bins for the loss cone profiles calculation. Default is 10.
-        N_trapz_bins: int, optional
-            Number of bins to use for the trapezoidal integration in the loss cone profiles calculation. Default is 1000.
-        """
-
-        super().__init__(r_bin_min, r_bin_max, N_bins)
-
-        # Store the reduced bins for the loss cone profiles calculation.
-        self._reduce_factor = reduce_factor
-        self._N_reduced_bins = self._N_bins // self._reduce_factor
-
-        self.reduced_r_bins = self._reduce_bins(self.r_bins)
-        self.reduced_mass_bins = self._reduce_bins(self.mass_bins)
-        self.reduced_psi_bins = -self._reduce_bins(self.phi_bins)
-        self.reduced_epsilon_bins = self._reduce_bins(self.epsilon_bins)
-        self.reduced_g_epsilon_bins = self._reduce_bins(self.g_epsilon_bins)
-
-        # Store the number of bins to use for the trapezoidal integration in the loss cone profiles calculation.
-        self._N_trapz_bins = N_trapz_bins
-
-        self._get_Jc_sqr_bins()
-        self._get_h_epsilon_bins()
-
-    def _reduce_bins(self, bins):
-        """
-        Reduce the number of bins by the reduce factor.
-
-        Parameters:
-        ----------
-        bins: array
-            Array of bins to reduce.
-
-        Returns:
-        -------
-        reduced_bins: array
-            Array of reduced bins.
-        """
-
-        _mask = np.arange(0, bins.shape[0], self._reduce_factor)
-
-        return bins[_mask]
-
-    def _get_Jc_sqr_bins(self):
+    # LOSS CONE PROFILES CALCULATIONS
+    def _get_Jc_sqr_bins(self, epsilon_bins):
         """
         Get the square angular momentum of a circular orbit bins.
 
-        Set Attributes:
+        Parameters:
+        ----------
+        epsilon_bins: array
+            Array of epsilon bins in scale_velocity^2.
+
+        Returns:
         -------
         reduced_Jc_sqr_bins: array
             Array of Jc square bins in scale_length^2 * scale_velocity^2.
@@ -322,9 +282,7 @@ class BaseLossCone(BaseProfile):
             np.log(_orbit_epsilon_bins), np.log(_orbit_Jc_sqr_bins)
         )
 
-        self.reduced_Jc_sqr_bins = np.exp(
-            _log_log_Jc_sqr_interp(np.log(self.reduced_epsilon_bins))
-        )
+        return np.exp(_log_log_Jc_sqr_interp(np.log(epsilon_bins)))
 
     def _get_h_epsilon_interps(self):
         """
@@ -373,11 +331,18 @@ class BaseLossCone(BaseProfile):
             _log_log_I_0_bar_interp,
         )
 
-    def _get_h_epsilon_bins(self):
+    def _get_h_epsilon_bins(self, epsilon_bins, max_psi):
         """
         Get the h bins for the loss cone profiles calculation.
 
-        Set Attributes:
+        Parameters:
+        ----------
+        epsilon_bins: array
+            Array of epsilon bins in scale_velocity^2.
+        max_psi: float
+            Maximum psi value to integrate to in scale_velocity^2.
+
+        Returns:
         -------
         reduced_h_epsilon_bins: array
             Array of h bins in scale_length^3 / scale_velocity.
@@ -396,8 +361,8 @@ class BaseLossCone(BaseProfile):
             )
 
         h_bins = []
-        for i in tqdm(range(self._N_reduced_bins), desc="Calculating h bins"):
-            _epsilon = self.reduced_epsilon_bins[i]
+        for i in tqdm(range(self._N_reduced_bins), desc="Calculating h(eps)"):
+            _epsilon = epsilon_bins[i]
 
             def _h_integrand(psi):
                 _r_sqr = np.exp(_log_log_r_sqr_interp(np.log(psi)))
@@ -422,6 +387,37 @@ class BaseLossCone(BaseProfile):
                     )
                 )
 
-            h_bins.append(quad(_h_integrand, self.reduced_psi_bins[0], _epsilon)[0])
+            h_bins.append(quad(_h_integrand, max_psi, _epsilon)[0])
 
-        self.reduced_h_epsilon_bins = np.array(h_bins)
+        return np.array(h_bins)
+
+    def _get_reduced_profiles(self):
+        _mask = np.arange(0, self._N_bins, self._reduce_factor)
+
+        self.reduced_epsilon_bins = self.epsilon_bins[_mask]
+        self.reduced_g_epsilon_bins = self.g_epsilon_bins[_mask]
+
+        self.reduced_Jc_sqr_bins = self._get_Jc_sqr_bins(self.reduced_epsilon_bins)
+
+        self.reduced_h_epsilon_bins = self._get_h_epsilon_bins(
+            self.reduced_epsilon_bins, -self.phi_bins[0]
+        )
+
+
+class SingularIsothermalSphereProfile(BaseProfile):
+    def _get_stellar_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the singular isothermal sphere halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        return 1 / (2 * np.pi * r_bins**2)
