@@ -104,9 +104,9 @@ class BaseProfile:
 
         Returns:
         -------
-        eta_bins: array
-            Array of eta bins in scale_velocity^2.
-        f_eta_bins: array
+        epsilon_bins: array
+            Array of epsilon bins in scale_velocity^2.
+        g_epsilon_bins: array
             Array of Eddington distribution probability bins in (scale_velocity)^-2.
         """
 
@@ -132,32 +132,32 @@ class BaseProfile:
             np.log(_psi_interp_bins), np.log(_d2rho_dpsi2_bins)
         )
 
-        _eta_bins = _psi_bins
-        _f_eta_bins = [0]
+        _epsilon_bins = _psi_bins
+        _g_epsilon_bins = [0]
         for i in tqdm(range(1, self._N_bins), desc="Eddington's inversion"):
 
-            def _f_eta_integrand(psi):
+            def _g_epsilon_integrand(psi):
                 return (
                     1
                     / np.sqrt(_psi_bins[i] - psi)  # noqa: B023
                     * np.exp(_log_log_d2rho_dpsi2_interp(np.log(psi)))
                 )
 
-            _f_eta_bins.append(
+            _g_epsilon_bins.append(
                 quad(
-                    _f_eta_integrand,
+                    _g_epsilon_integrand,
                     _psi_bins[0],
                     _psi_bins[i],
                 )[0]
             )
 
-        return _eta_bins, 1 / np.sqrt(8) / np.pi**2 * np.array(_f_eta_bins)
+        return _epsilon_bins, 1 / np.sqrt(8) / np.pi**2 * np.array(_g_epsilon_bins)
 
     def _get_profiles(self):
         """
         Get the profiles of the halo.
 
-        Returns:
+        Set Attributes:
         -------
         r_bins: array
             Array of radius bins in scale_length.
@@ -172,9 +172,9 @@ class BaseProfile:
         phi_bins: array
             Array of potential bins in scale_velocity^2.
 
-        eta_bins: array
-            Array of eta bins in scale_velocity^2.
-        f_eta_bins: array
+        epsilon_bins: array
+            Array of epsilon bins in scale_velocity^2.
+        g_epsilon_bins: array
             Array of Eddington distribution probability bins in (scale_velocity)^-2.
         """
 
@@ -195,22 +195,22 @@ class BaseProfile:
         self.mass_bins = self.stellar_mass_bins + 1
         self.phi_bins = self.stellar_phi_bins - 1 / self.r_bins
 
-        self.eta_bins, self.f_eta_bins = self._get_Eddington_bins(
+        self.epsilon_bins, self.g_epsilon_bins = self._get_Eddington_bins(
             self.stellar_rho_bins, self.phi_bins
         )
 
-    def reconstruct_stellar_rho_bins(self, psi_bins, eta_bins, f_eta_bins):
+    def reconstruct_stellar_rho_bins(self, psi_bins, epsilon_bins, g_epsilon_bins):
         """
         Reconstruct the density profile from the potential and Eddington distribution.
 
         Parameters:
         ----------
         psi_bins: array
-            Array of negative potential bins in scale_velocity^2 = G scale_mass / scale_length.
-        eta_bins: array
-            Array of eta bins in scale_velocity^2 = G scale_mass / scale_length.
-        f_eta_bins: array
-            Array of Eddington distribution probability bins in (scale_velocity)^-2 = (G scale_mass / scale_length)^-1.
+            Array of negative potential bins in scale_velocity^2.
+        epsilon_bins: array
+            Array of epsilon bins in scale_velocity^2.
+        g_epsilon_bins: array
+            Array of Eddington distribution probability bins in (scale_velocity)^-2.
 
         Returns:
         -------
@@ -218,14 +218,16 @@ class BaseProfile:
             Array of reconstructed density bins in scale_mass / scale_length^3.
         """
 
-        _log_log_eddington_interp = get_interp(np.log(eta_bins), np.log(f_eta_bins))
+        _log_log_eddington_interp = get_interp(
+            np.log(epsilon_bins), np.log(g_epsilon_bins)
+        )
 
-        def _rho_integrand(eta_prime, psi):
+        def _rho_integrand(epsilon_prime, psi):
             return (
                 4
                 * np.pi
-                * np.sqrt(2 * (psi - eta_prime))
-                * np.exp(_log_log_eddington_interp(np.log(eta_prime)))
+                * np.sqrt(2 * (psi - epsilon_prime))
+                * np.exp(_log_log_eddington_interp(np.log(epsilon_prime)))
             )
 
         _reconstructed_rho_bins = []
@@ -235,3 +237,191 @@ class BaseProfile:
             )
 
         return np.array(_reconstructed_rho_bins)
+
+
+class BaseLossCone(BaseProfile):
+    def __init__(
+        self,
+        r_bin_min=1e-4,
+        r_bin_max=1e4,
+        N_bins=10000,
+        reduce_factor=10,
+        N_trapz_bins=1000,
+    ):
+        """
+        Initialize the base loss cone class. The loss cone profiles are defined in scale
+        parameters as in the case of the base profile class.
+
+        Parameters:
+        ----------
+        r_bin_min: float, optional
+            Minimum profile radius of the halo in scale_length. Default is 1e-4.
+        r_bin_max: float, optional
+            Maximum profile radius of the halo in scale_length. Default is 1e4.
+        N_bins: int, optional
+            Number of bins to use for the profiles. Default is 10000.
+
+        reduce_factor: int, optional
+            Factor by which to reduce the number of bins for the loss cone profiles calculation. Default is 10.
+        N_trapz_bins: int, optional
+            Number of bins to use for the trapezoidal integration in the loss cone profiles calculation. Default is 1000.
+        """
+
+        super().__init__(r_bin_min, r_bin_max, N_bins)
+
+        # Store the reduced bins for the loss cone profiles calculation.
+        self._reduce_factor = reduce_factor
+        self._N_reduced_bins = self._N_bins // self._reduce_factor
+
+        self.reduced_r_bins = self._reduce_bins(self.r_bins)
+        self.reduced_mass_bins = self._reduce_bins(self.mass_bins)
+        self.reduced_psi_bins = -self._reduce_bins(self.phi_bins)
+        self.reduced_epsilon_bins = self._reduce_bins(self.epsilon_bins)
+        self.reduced_g_epsilon_bins = self._reduce_bins(self.g_epsilon_bins)
+
+        # Store the number of bins to use for the trapezoidal integration in the loss cone profiles calculation.
+        self._N_trapz_bins = N_trapz_bins
+
+        self._get_Jc_sqr_bins()
+        self._get_h_epsilon_bins()
+
+    def _reduce_bins(self, bins):
+        """
+        Reduce the number of bins by the reduce factor.
+
+        Parameters:
+        ----------
+        bins: array
+            Array of bins to reduce.
+
+        Returns:
+        -------
+        reduced_bins: array
+            Array of reduced bins.
+        """
+
+        _mask = np.arange(0, bins.shape[0], self._reduce_factor)
+
+        return bins[_mask]
+
+    def _get_Jc_sqr_bins(self):
+        """
+        Get the square angular momentum of a circular orbit bins.
+
+        Set Attributes:
+        -------
+        reduced_Jc_sqr_bins: array
+            Array of Jc square bins in scale_length^2 * scale_velocity^2.
+        """
+        _orbit_Vc_bins = np.sqrt(self.mass_bins / self.r_bins)
+
+        _orbit_epsilon_bins = -(self.phi_bins + 0.5 * _orbit_Vc_bins**2)
+        _orbit_Jc_sqr_bins = self.r_bins**2 * _orbit_Vc_bins**2
+
+        _log_log_Jc_sqr_interp = get_interp(
+            np.log(_orbit_epsilon_bins), np.log(_orbit_Jc_sqr_bins)
+        )
+
+        self.reduced_Jc_sqr_bins = np.exp(
+            _log_log_Jc_sqr_interp(np.log(self.reduced_epsilon_bins))
+        )
+
+    def _get_h_epsilon_interps(self):
+        """
+        Get the interpolators for the h bins calculation.
+
+        Returns:
+        -------
+        log_log_r_sqr_interp: function
+            Interpolator for (natural log) r^2 as a function of (natural log) psi.
+        log_log_neg_dr_dpsi_interp: function
+            Interpolator for (natural log) - dr / dpsi as a function of (natural log) psi.
+        log_log_g_epsilon_interp: function
+            Interpolator for (natural log) g as a function of (natural log) epsilon.
+        log_log_I_0_bar_interp: function
+            Interpolator for (natural log) I_0_bar as a function of (natural log) epsilon.
+        """
+
+        _log_log_r_sqr_interp = get_interp(
+            np.log(-self.phi_bins), 2 * np.log(self.r_bins)
+        )
+
+        _log_log_neg_dr_dpsi_interp = get_interp(
+            np.log(-self.phi_bins),
+            np.log(
+                -self.r_bins
+                / (-self.phi_bins)
+                * np.gradient(np.log(self.r_bins), np.log(-self.phi_bins))
+            ),
+        )
+
+        _log_log_g_epsilon_interp = get_interp(
+            np.log(self.epsilon_bins), np.log(self.g_epsilon_bins)
+        )
+
+        _I_0_bar_bins = cumulative_trapezoid(
+            self.g_epsilon_bins, self.epsilon_bins, initial=0
+        )
+        _log_log_I_0_bar_interp = get_interp(
+            np.log(self.epsilon_bins), np.log(_I_0_bar_bins)
+        )
+
+        return (
+            _log_log_r_sqr_interp,
+            _log_log_neg_dr_dpsi_interp,
+            _log_log_g_epsilon_interp,
+            _log_log_I_0_bar_interp,
+        )
+
+    def _get_h_epsilon_bins(self):
+        """
+        Get the h bins for the loss cone profiles calculation.
+
+        Set Attributes:
+        -------
+        reduced_h_epsilon_bins: array
+            Array of h bins in scale_length^3 / scale_velocity.
+        """
+
+        (
+            _log_log_r_sqr_interp,
+            _log_log_neg_dr_dpsi_interp,
+            _log_log_g_epsilon_interp,
+            _log_log_I_0_bar_interp,
+        ) = self._get_h_epsilon_interps()
+
+        def _I_n_bar_integrand(epsilon_prime, psi, n):
+            return (psi - epsilon_prime) ** (n / 2) * np.exp(
+                _log_log_g_epsilon_interp(np.log(epsilon_prime))
+            )
+
+        h_bins = []
+        for i in tqdm(range(self._N_reduced_bins), desc="Calculating h bins"):
+            _epsilon = self.reduced_epsilon_bins[i]
+
+            def _h_integrand(psi):
+                _r_sqr = np.exp(_log_log_r_sqr_interp(np.log(psi)))
+                _dr_dpsi = -np.exp(_log_log_neg_dr_dpsi_interp(np.log(psi)))
+
+                _epsilon_prime_bins = np.linspace(_epsilon, psi, self._N_trapz_bins)  # noqa: B023
+                _I_1_bar = np.trapezoid(
+                    _I_n_bar_integrand(_epsilon_prime_bins, psi, 1), _epsilon_prime_bins
+                )
+                _I_3_bar = np.trapezoid(
+                    _I_n_bar_integrand(_epsilon_prime_bins, psi, 3), _epsilon_prime_bins
+                )
+                _I_0_bar = np.exp(_log_log_I_0_bar_interp(np.log(_epsilon)))  # noqa: B023
+
+                return (
+                    _r_sqr
+                    * _dr_dpsi
+                    * (
+                        3 * (psi - _epsilon) ** (-1) * _I_1_bar  # noqa: B023
+                        - (psi - _epsilon) ** (-2) * _I_3_bar  # noqa: B023
+                        + 2 * (psi - _epsilon) ** (-1 / 2) * _I_0_bar  # noqa: B023
+                    )
+                )
+
+            h_bins.append(quad(_h_integrand, self.reduced_psi_bins[0], _epsilon)[0])
+
+        self.reduced_h_epsilon_bins = np.array(h_bins)
