@@ -439,3 +439,121 @@ class SingularIsothermalSphereProfile(BaseProfile):
         """
 
         return 1 / (2 * np.pi * r_bins**2)
+
+
+class PlummerCuspProfile(BaseProfile):
+    def __init__(self, M_s, *args, **kwargs):
+        """
+        Initialize the Plummer cusp profile class. The Plummer cusp profile is defined
+        as a Plummer profile with a Bahcall-Wolf cusp inside the radius of influence.
+        The scale length is [fill in info]
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
+        """
+
+        self.M_s = M_s
+
+        self._mu = 1 / self.M_s
+        self._a = np.sqrt(
+            (1 - self._mu ** (2 / 3)) / self._mu ** (2 / 3)
+        )  # np.sqrt(13/7)
+
+        super().__init__(*args, **kwargs)
+
+    def _get_Plummer_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the Plummer halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        return (
+            3
+            / self._mu
+            / (4 * np.pi)
+            / self._a**3
+            * (1 + r_bins**2 / self._a**2) ** (-5 / 2)
+        )
+
+    def _get_Bahcall_Wolf_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the Bahcall-Wolf cusp halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        _rho0 = self._get_Plummer_rho_bins(1)
+
+        return _rho0 * r_bins ** (-7 / 4)
+
+    def _get_stellar_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the Plummer cusp halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        return np.where(
+            r_bins < 1,
+            self._get_Bahcall_Wolf_rho_bins(r_bins),
+            self._get_Plummer_rho_bins(r_bins),
+        )
+
+
+class HernquistProfile(BaseProfile):
+    def __init__(self, M_s, *args, **kwargs):
+        """
+        Initialize the Hernquist profile class. The scale length (i.e. the influent radius
+        of the central black hole) is defined as the radius where the enclosed stellar mass
+        is equal to the mass of the central black hole, i.e. M_s(<r_h) = M_s.
+        This gives a stellar scale radius of a = sqrt(M_s) - 1 in scale length.
+        """
+
+        self.M_s = M_s
+        self.a = np.sqrt(M_s) - 1
+
+        super().__init__(*args, **kwargs)
+
+    def _get_stellar_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the Hernquist halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        return self.M_s / (2 * np.pi) * self.a / r_bins / (r_bins + self.a) ** 3

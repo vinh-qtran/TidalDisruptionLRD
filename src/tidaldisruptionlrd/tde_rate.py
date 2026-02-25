@@ -269,10 +269,24 @@ class SingleMassTDERate(BaseTDERate):
     Class for calculating the TDE rate for a single mass stellar population.
     """
 
-    def _get_mass_function_bins(self, m_s_bins, m_s0=1):
+    def __init__(self, m_s0=1, *args, **kwargs):
+        """
+        Initialize the TDE rate class.
+
+        Parameters:
+        ----------
+        m_s0: float
+            The single stellar mass in M_sun.
+        """
+
+        self._m_s0 = m_s0
+
+        super().__init__(*args, **kwargs)
+
+    def _get_mass_function_bins(self, m_s_bins):
         _m_s_bin_centers = 0.5 * (m_s_bins[1:] + m_s_bins[:-1])
 
-        _m_s0_idx = np.argmin(np.abs(_m_s_bin_centers - m_s0))
+        _m_s0_idx = np.argmin(np.abs(_m_s_bin_centers - self._m_s0))
 
         _mass_function_bins = np.zeros_like(m_s_bins)
         _mass_function_bins[_m_s0_idx] = 2 / (
@@ -280,3 +294,67 @@ class SingleMassTDERate(BaseTDERate):
         )
 
         return _mass_function_bins
+
+
+class SalpeterTDERate(BaseTDERate):
+    """
+    Class for calculating the TDE rate for a Salpeter mass function stellar population.
+    """
+
+    def __init__(self, m_s_max=1, m_s_min=0.08, *args, **kwargs):
+        """
+        Initialize the TDE rate class.
+
+        Parameters:
+        ----------
+        m_s_max: float
+            The maximum stellar mass in M_sun. Default is 1 M_sun, the turnoff mass for a 10 Gyr old population.
+        m_s_min: float
+            The minimum stellar mass in M_sun. Default is 0.08 M_sun, the hydrogen burning limit.
+        """
+
+        self._m_s_max = m_s_max
+        self._m_s_min = m_s_min
+
+        super().__init__(*args, **kwargs)
+
+    def _get_mass_function_bins(self, m_s_bins):
+        return np.where(
+            (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
+            0.046 * m_s_bins ** (-2.35),  # m_s_min < m < m_s_max
+            0,  # otherwise
+        )
+
+
+class KroupaTDERate(BaseTDERate):
+    """
+    Class for calculating the TDE rate for a Kroupa mass function stellar population.
+    """
+
+    def __init__(self, m_s_max=1, m_s_min=0.08, *args, **kwargs):
+        """
+        Initialize the TDE rate class.
+
+        Parameters:
+        ----------
+        m_s_max: float
+            The maximum stellar mass in M_sun. Default is 1 M_sun, the turnoff mass for a 10 Gyr old population.
+        m_s_min: float
+            The minimum stellar mass in M_sun. Default is 0.08 M_sun, the hydrogen burning limit.
+        """
+
+        self._m_s_max = m_s_max
+        self._m_s_min = m_s_min
+
+        super().__init__(*args, **kwargs)
+
+    def _get_mass_function_bins(self, m_s_bins):
+        return np.where(
+            (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
+            np.where(
+                m_s_bins < 0.5,
+                0.98 * m_s_bins ** (-1.3),  # m_s_min < m < 0.5
+                2.4 * m_s_bins ** (-2.3),  # 0.5 < m < m_s_max
+            ),
+            0,  # otherwise
+        )
