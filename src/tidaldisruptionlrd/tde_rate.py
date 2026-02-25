@@ -36,7 +36,7 @@ class BaseTDERate:
 
         self._m_s_bins = m_s_bins
         self._mass_func_bins = self._get_mass_function_bins(m_s_bins)
-        self._m_avg, self._m_sqr_avg = self._get_mass_moment(
+        self._m_norm, self._m_avg, self._m_sqr_avg = self._get_mass_moment(
             self._m_s_bins, self._mass_func_bins
         )
 
@@ -51,7 +51,7 @@ class BaseTDERate:
             _timescale = self._timescales[_i]
 
             _N_TDE_bins = self._get_N_TDE_bins(_M_bh, _r_h)
-            _N_TDE = (
+            _N_TDE = self._m_norm * (
                 np.trapezoid(_N_TDE_bins * self._mass_func_bins, self._m_s_bins)
                 / _timescale
             )
@@ -105,18 +105,20 @@ class BaseTDERate:
 
         Returns:
         -------
+        m_norm: float
+            The normalization of the mass function.
         m_avg: float
             The average stellar mass in M_sun.
         m_sqr_avg: float
             The average of the square of the stellar mass in M_sun^2.
         """
 
-        _normalizer = 1 / np.trapezoid(mass_func_bins, m_s_bins)
+        m_norm = 1 / np.trapezoid(mass_func_bins, m_s_bins)
 
-        m_avg = _normalizer * np.trapezoid(m_s_bins * mass_func_bins, m_s_bins)
-        m_sqr_avg = _normalizer * np.trapezoid(m_s_bins**2 * mass_func_bins, m_s_bins)
+        m_avg = m_norm * np.trapezoid(m_s_bins * mass_func_bins, m_s_bins)
+        m_sqr_avg = m_norm * np.trapezoid(m_s_bins**2 * mass_func_bins, m_s_bins)
 
-        return m_avg, m_sqr_avg
+        return m_norm, m_avg, m_sqr_avg
 
     def _get_r_t_bins(self, m_s_bins, M_bh):
         """
@@ -195,7 +197,6 @@ class BaseTDERate:
         return np.log(
             _scaler
             * ((r_t / r_h) ** (-1) - self._epsilon_bar_bins)
-            * self._h_bar_bins
             / self._Jc_sqr_bar_bins
         ) + np.where(
             q_bins > 1,
