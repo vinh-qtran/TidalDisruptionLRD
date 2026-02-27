@@ -18,6 +18,7 @@ class BaseProfile:
         N_bins=10000,
         reduce_factor=10,
         N_trapz_bins=1000,
+        show_progress=True,
     ):
         """
         Initialize the base profile class. The profile is defined in scale parameters,
@@ -39,7 +40,12 @@ class BaseProfile:
             Factor by which to reduce the number of bins for the loss cone calculations. Default is 10.
         N_trapz_bins: int, optional
             Number of bins to use for the trapezoidal integration in the loss cone calculations. Default is 1000.
+
+        show_progress: bool, optional
+            Whether to show the progress bar for the profile calculations. Default is True.
         """
+
+        self._show_progress = show_progress
 
         self._r_bin_min = r_bin_min
         self._r_bin_max = r_bin_max
@@ -158,7 +164,11 @@ class BaseProfile:
 
         _epsilon_bins = _psi_bins
         _g_epsilon_bins = [0]
-        for i in tqdm(range(1, self._N_bins), desc="Calculating g(eps)"):
+        for i in tqdm(
+            range(1, self._N_bins),
+            desc="Calculating g(eps)",
+            disable=not self._show_progress,
+        ):
 
             def _g_epsilon_integrand(psi):
                 return (
@@ -256,7 +266,9 @@ class BaseProfile:
             )
 
         _reconstructed_rho_bins = []
-        for _psi in tqdm(psi_bins, desc="Reconstructing densities"):
+        for _psi in tqdm(
+            psi_bins, desc="Reconstructing densities", disable=not self._show_progress
+        ):
             _reconstructed_rho_bins.append(  # noqa: PERF401
                 quad(_rho_integrand, 0, _psi, args=(_psi,))[0]
             )
@@ -379,7 +391,11 @@ class BaseProfile:
             )
 
         h_bins = []
-        for i in tqdm(range(len(epsilon_bins)), desc="Calculating h(eps)"):
+        for i in tqdm(
+            range(len(epsilon_bins)),
+            desc="Calculating h(eps)",
+            disable=not self._show_progress,
+        ):
             _epsilon = epsilon_bins[i]
 
             def _h_integrand(psi):
@@ -441,8 +457,44 @@ class SingularIsothermalSphereProfile(BaseProfile):
         return 1 / (2 * np.pi * r_bins**2)
 
 
+class PowerLawProfile(BaseProfile):
+    def __init__(self, gamma, *args, **kwargs):
+        """
+        Initialize the power law profile class. The power law profile is defined as a
+        singular isothermal sphere halo with a power law density profile, i.e. rho ~ r^-gamma.
+
+        Parameters:
+        ----------
+        gamma: float
+            The (negative) power law slope of the density profile.
+        """
+        if gamma >= 3 or gamma <= 0:
+            raise ValueError("Gamma must be between 0 and 3 for a physical profile.")  # noqa: EM101, TRY003
+
+        self.gamma = gamma
+
+        super().__init__(*args, **kwargs)
+
+    def _get_stellar_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the singular isothermal sphere halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        rho_bins: array
+            Array of density bins in scale_mass / scale_length^3.
+        """
+
+        return (3 - self.gamma) / (4 * np.pi) / r_bins**self.gamma
+
+
 class PlummerCuspProfile(BaseProfile):
-    def __init__(self, M_s, *args, **kwargs):
+    def __init__(self, M_s, n=4, *args, **kwargs):
         """
         Initialize the Plummer cusp profile class. The Plummer cusp profile is defined
         as a Plummer profile with a Bahcall-Wolf cusp inside the radius of influence.
@@ -452,58 +504,16 @@ class PlummerCuspProfile(BaseProfile):
         ----------
         M_s: float
             The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
+        n: int, optional
+            The power law slope scaler of the inner cusp. Default is 4.
         """
 
         self.M_s = M_s
+        self.a = (12 / 5 * self.M_s) ** (1 / 3)
 
-        self._mu = 1 / self.M_s
-        self._a = np.sqrt(
-            (1 - self._mu ** (2 / 3)) / self._mu ** (2 / 3)
-        )  # np.sqrt(13/7)
+        self._n = n
 
         super().__init__(*args, **kwargs)
-
-    def _get_Plummer_rho_bins(self, r_bins):
-        """
-        Get the stellar density profile of the Plummer halo.
-
-        Parameters:
-        ----------
-        r_bins: array
-            Array of radius bins in scale_length.
-
-        Returns:
-        -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
-        """
-
-        return (
-            3
-            / self._mu
-            / (4 * np.pi)
-            / self._a**3
-            * (1 + r_bins**2 / self._a**2) ** (-5 / 2)
-        )
-
-    def _get_Bahcall_Wolf_rho_bins(self, r_bins):
-        """
-        Get the stellar density profile of the Bahcall-Wolf cusp halo.
-
-        Parameters:
-        ----------
-        r_bins: array
-            Array of radius bins in scale_length.
-
-        Returns:
-        -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
-        """
-
-        _rho0 = self._get_Plummer_rho_bins(1)
-
-        return _rho0 * r_bins ** (-7 / 4)
 
     def _get_stellar_rho_bins(self, r_bins):
         """
@@ -519,11 +529,15 @@ class PlummerCuspProfile(BaseProfile):
         rho_bins: array
             Array of density bins in scale_mass / scale_length^3.
         """
+        self.a = max(self.a, self._r_bin_min * 10)
 
-        return np.where(
-            r_bins < 1,
-            self._get_Bahcall_Wolf_rho_bins(r_bins),
-            self._get_Plummer_rho_bins(r_bins),
+        return (
+            3
+            * self.M_s
+            / (4 * np.pi * self.a**3)
+            * r_bins ** (-7 / 4)
+            * (1 + r_bins**self._n) ** (7 / 4 / self._n)
+            * (1 + (r_bins / self.a) ** 2) ** (-5 / 2)
         )
 
 
@@ -534,6 +548,11 @@ class HernquistProfile(BaseProfile):
         of the central black hole) is defined as the radius where the enclosed stellar mass
         is equal to the mass of the central black hole, i.e. M_s(<r_h) = M_s.
         This gives a stellar scale radius of a = sqrt(M_s) - 1 in scale length.
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
         """
 
         self.M_s = M_s
@@ -555,5 +574,6 @@ class HernquistProfile(BaseProfile):
         rho_bins: array
             Array of density bins in scale_mass / scale_length^3.
         """
+        self.a = max(self.a, self._r_bin_min * 10)
 
         return self.M_s / (2 * np.pi) * self.a / r_bins / (r_bins + self.a) ** 3

@@ -6,7 +6,15 @@ from tidaldisruptionlrd.constants import G, Rsun
 
 
 class BaseTDERate:
-    def __init__(self, dimensionless_profile, m_s_bins, M_bhs, r_hs, eta=0.844):
+    def __init__(
+        self,
+        dimensionless_profile,
+        M_bhs,
+        r_hs,
+        m_s_bins=np.linspace(0.08, 2, 1000),  # noqa: B008
+        eta=0.844,
+        show_progress=True,
+    ):
         """
         Initialize the base TDE rate class.
 
@@ -15,17 +23,22 @@ class BaseTDERate:
         dimensionless_profile: Profile
             The dimensionless profile of the stellar distribution.
 
-        m_s_bins: array
-            Array of stellar mass bins in M_sun.
-
         M_bhs: array
             Array of black hole masses in M_sun.
         r_hs: array
-            Array of black hole influence radii in pc.
+            Array of black hole influence radii in kpc.
+
+        m_s_bins: array
+            Array of stellar mass bins in M_sun. Default is 1000 bins from 0.08 M_sun to 2 M_sun, the typical mass range of main sequence stars in an old population.
 
         eta: float, optional
             The tidal disruption parameter, eta=0.844 for n=3 polytrope. Default is 0.844.
+
+        show_progress: bool, optional
+            Whether to show the progress bar for the TDE rate calculation. Default is True.
         """
+
+        self._show_progress = show_progress
 
         self._read_profile(dimensionless_profile)
 
@@ -45,7 +58,11 @@ class BaseTDERate:
         )
 
         _N_TDEs = []
-        for _i in tqdm(range(len(self.M_bhs)), desc="Calculating TDE rates"):
+        for _i in tqdm(
+            range(len(self.M_bhs)),
+            desc="Calculating TDE rates",
+            disable=not show_progress,
+        ):
             _M_bh = self.M_bhs[_i]
             _r_h = self.r_hs[_i]
             _timescale = self._timescales[_i]
@@ -134,7 +151,7 @@ class BaseTDERate:
         Returns:
         -------
         r_t_bins: array
-            Array of tidal radius bins in pc.
+            Array of tidal radius bins in kpc.
         """
 
         return Rsun * self._eta ** (2 / 3) * (m_s_bins / M_bh) ** 0.467 * M_bh**0.8
@@ -148,9 +165,9 @@ class BaseTDERate:
         M_bh: float
             Black hole mass in M_sun.
         r_t: float
-            Tidal radius in pc.
+            Tidal radius in kpc.
         r_h: float
-            Influence radius in pc.
+            Influence radius in kpc.
 
         Returns:
         -------
@@ -182,9 +199,9 @@ class BaseTDERate:
         q_bins: array
             Array of q bins.
         r_t: float
-            Tidal radius in pc.
+            Tidal radius in kpc.
         r_h: float
-            Influence radius in pc.
+            Influence radius in kpc.
 
         Returns:
         -------
@@ -243,7 +260,7 @@ class BaseTDERate:
         M_bh: float
             Black hole mass in M_sun.
         r_h: float
-            Influence radius in pc.
+            Influence radius in kpc.
 
         Returns:
         -------
