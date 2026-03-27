@@ -33,6 +33,7 @@ dynamic = ["version"]
 dependencies = [
     "astropy>=6.1.7",
     "numpy>=2.2.6",
+    "pandas>=3.0.1",
     "scipy>=1.15.3",
     "tqdm>=4.67.3",
 ]

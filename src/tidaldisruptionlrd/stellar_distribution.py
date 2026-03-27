@@ -23,7 +23,7 @@ class BaseProfile:
         """
         Initialize the base profile class. The profile is defined in scale parameters,
         with the scale mass being the mass of the central black hole and the scale length
-        being the radius of influence of the black hole. The scale velocity is then
+        often chosen as the black hole's radius of influence. The scale velocity is then
         defined as sqrt(G * scale_mass / scale_length), i.e. the velocity dispersion of
         the stars at the radius of influence.
 
@@ -509,7 +509,7 @@ class PlummerCuspProfile(BaseProfile):
         """
 
         self.M_s = M_s
-        self.a = (12 / 5 * self.M_s) ** (1 / 3)
+        self.a = (2.620 * self.M_s) ** (1 / 3)
 
         self._n = n
 
