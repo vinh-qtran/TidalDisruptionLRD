@@ -280,6 +280,38 @@ class BaseTDERate:
 
         return np.array(_N_TDE_bins)
 
+    def get_single_F_bar_bins(self, M_bh, r_h):
+        """
+        Get the F_bar bins for a single black hole mass, for testing purposes.
+
+        Parameters:
+        ----------
+        M_bh: float
+            Black hole mass in M_sun.
+        r_h: float
+            Influence radius in kpc.
+        r_t: float
+            Tidal radius in kpc.
+
+        Returns:
+        -------
+        F_bar_bins: array
+            Array of F_bar bins.
+        """
+        _r_t_bins = self._get_r_t_bins(self._m_s_bins, M_bh)
+
+        _F_bar_bins = []
+        for _r_t in _r_t_bins:
+            _q_bins = self._get_q_bins(M_bh, _r_t, r_h)
+            _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h)
+            _F_bar_bins.append(self._get_F_bar_bins(_ln_R0_bins, M_bh))
+
+        return self._m_norm * np.trapezoid(
+            np.array(_F_bar_bins) * self._mass_func_bins.reshape(-1, 1),
+            self._m_s_bins,
+            axis=0,
+        )
+
 
 class SingleMassTDERate(BaseTDERate):
     """

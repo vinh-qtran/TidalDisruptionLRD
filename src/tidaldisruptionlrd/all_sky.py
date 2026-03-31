@@ -31,7 +31,7 @@ class TDEGrid:
         sigma_coeff=None,
         sigma=None,
         sigma_params={"M200": 3.09e8, "p": 4.38},  # noqa: B006
-        a_params={"M0": 1e9, "a0": 0.055, "alpha": 0.22},  # noqa: B006
+        a_params={"M0": 1e9, "a0": 0.055, "alpha": 0.75},  # noqa: B006
     ):
         """
         Initialize the TDEGrid class, which computes TDE rates for a grid of black hole masses and stellar mass scalers.
@@ -316,8 +316,11 @@ class LRDNum:
 
 
 class AllSkyTDERate:
-    def __init__(self, tde_grid, lrd_num_z4, lrd_num_z5):
+    def __init__(self, tde_grid, lrd_num_z4, lrd_num_z5=None):
         self._get_tde_interp(tde_grid)
+
+        if lrd_num_z5 is None:
+            lrd_num_z5 = lrd_num_z4
         self._get_lrd_num(lrd_num_z4, lrd_num_z5)
 
         self._get_all_sky_tde_rate()
