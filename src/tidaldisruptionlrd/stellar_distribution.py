@@ -509,11 +509,29 @@ class PlummerCuspProfile(BaseProfile):
         """
 
         self.M_s = M_s
-        self.a = (2.620 * self.M_s) ** (1 / 3)
+        self.a = self._get_a(M_s)
 
         self._n = n
 
         super().__init__(*args, **kwargs)
+
+    def _get_a(self, M_s):
+        """
+        Get the scale radius of the Plummer cusp profile.
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass (i.e. the mass of the
+            central black hole).
+
+        Returns:
+        -------
+        a: float
+            The scale radius in scale_length.
+        """
+
+        return max((2.620 * M_s) ** (1 / 3), 0.1)
 
     def _get_stellar_rho_bins(self, r_bins):
         """
@@ -529,7 +547,6 @@ class PlummerCuspProfile(BaseProfile):
         rho_bins: array
             Array of density bins in scale_mass / scale_length^3.
         """
-        self.a = max(self.a, self._r_bin_min * 10)
 
         return (
             3
@@ -556,9 +573,27 @@ class HernquistProfile(BaseProfile):
         """
 
         self.M_s = M_s
-        self.a = np.sqrt(M_s) - 1
+        self.a = self._get_a(M_s)
 
         super().__init__(*args, **kwargs)
+
+    def _get_a(self, M_s):
+        """
+        Get the scale radius of the Hernquist profile.
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass (i.e. the mass of the
+            central black hole).
+
+        Returns:
+        -------
+        a: float
+            The scale radius in scale_length.
+        """
+
+        return max(np.sqrt(M_s) - 1, 0.1)
 
     def _get_stellar_rho_bins(self, r_bins):
         """
@@ -574,6 +609,5 @@ class HernquistProfile(BaseProfile):
         rho_bins: array
             Array of density bins in scale_mass / scale_length^3.
         """
-        self.a = max(self.a, self._r_bin_min * 10)
 
         return self.M_s / (2 * np.pi) * self.a / r_bins / (r_bins + self.a) ** 3

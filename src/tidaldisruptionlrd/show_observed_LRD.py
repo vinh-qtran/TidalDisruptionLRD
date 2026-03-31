@@ -157,9 +157,15 @@ Harikane_data["x_limit"] = Harikane_x_limit
 
 
 def plot_error_bar(ax, data_frame, name, color):
-    x, y = data_frame[0], data_frame[1]
-    xerr_lower, xerr_upper = data_frame["x_err_lower"], data_frame["x_err_upper"]
-    yerr_lower, yerr_upper = data_frame["y_err_lower"], data_frame["y_err_upper"]
+    x, y = 10 ** data_frame[0], 10 ** data_frame[1]
+    xerr_lower, xerr_upper = (
+        10 ** data_frame[0] - 10 ** (data_frame[0] - data_frame["x_err_lower"]),
+        10 ** (data_frame[0] + data_frame["x_err_upper"]) - 10 ** data_frame[0],
+    )
+    yerr_lower, yerr_upper = (
+        10 ** data_frame[1] - 10 ** (data_frame[1] - data_frame["y_err_lower"]),
+        10 ** (data_frame[1] + data_frame["y_err_upper"]) - 10 ** data_frame[1],
+    )
 
     for i in range(len(data_frame)):
         if not data_frame["x_limit"][i]:
@@ -197,38 +203,38 @@ def plot_error_bar(ax, data_frame, name, color):
             )
 
 
-def show_observed_LRD(ax):
-    x = np.linspace(7, 13, 100)
-    y = 9 + np.log10(0.49) + 1.17 * (x - 11)
-    (l1,) = ax.plot(x, y, lw=4, linestyle="--", dashes=(12, 6), color="navy")
-    ax.fill_between(x, y - 0.28, y + 0.28, color="navy", alpha=0.3)
+def show_observed_LRD(ax, legend_loc):
+    # x = np.linspace(7, 13, 100)
+    # y = 9 + np.log10(0.49) + 1.17 * (x - 11)
+    # (l1,) = ax.plot(x, y, lw=4, linestyle="--", dashes=(12, 6), color="navy")
+    # ax.fill_between(x, y - 0.28, y + 0.28, color="navy", alpha=0.3)
 
-    x = np.linspace(7, 13, 100)
-    y = 7.45 + 1.05 * (x - 11)
-    (l2,) = ax.plot(x, y, lw=4, linestyle="--", dashes=(12, 6), color="grey")
-    ax.fill_between(x, y - 0.24, y + 0.24, color="grey", alpha=0.3)
+    # x = np.linspace(7, 13, 100)
+    # y = 7.45 + 1.05 * (x - 11)
+    # (l2,) = ax.plot(x, y, lw=4, linestyle="--", dashes=(12, 6), color="grey")
+    # ax.fill_between(x, y - 0.24, y + 0.24, color="grey", alpha=0.3)
 
-    leg1 = ax.legend([l1, l2], ["KH13 (local)", "RV15 (local)"], loc=4, fontsize=20)
+    # leg1 = ax.legend([l1, l2], ["KH13 (local)", "RV15 (local)"], loc=4, fontsize=20)
 
     ax.errorbar(
-        8.92,
-        8.61,
-        xerr=[[0.31], [0.30]],
-        yerr=[[0.37], [0.38]],
-        marker="*",
+        10**8.92,
+        10**8.61,
+        xerr=[[10**8.92 - 10 ** (8.92 - 0.31)], [10 ** (8.92 + 0.30) - 10**8.92]],
+        yerr=[[10**8.61 - 10 ** (8.61 - 0.37)], [10 ** (8.61 + 0.38) - 10**8.61]],
+        marker="o",
         linestyle="none",
-        ms=18,
+        ms=10,
         color="gold",
         mec="gold",
         capthick=2,
         lw=2,
         capsize=5,
-        label=r"$\rm Juodzbalis+24$",
+        label="Juodzbaliz+24",
     )
 
     plot_error_bar(ax, Stone_data, "Stone+24", "deeppink")
-    plot_error_bar(ax, Yue_data, "Yue+24", "crimson")
-    plot_error_bar(ax, Maiolino_data, "Maiolino+24", "darkorchid")
+    plot_error_bar(ax, Yue_data, "Yue+24", "darkorchid")
+    plot_error_bar(ax, Maiolino_data, "Maiolino+24", "crimson")
     plot_error_bar(ax, Harikane_data, "Harikane+23", "chocolate")
 
     x = np.array([np.log10(1.3e11), np.log10(3.4e10)])
@@ -236,10 +242,10 @@ def show_observed_LRD(ax):
     xhierr = np.array([np.log10(1.3e11 + 2.0e11), np.log10(3.4e10 + 7.6e10)]) - x
     y = np.array([np.log10(1.54e9), np.log10(2.02e8)])
     ax.errorbar(
-        x,
-        y,
-        xerr=[xloerr, xhierr],
-        yerr=0.4,
+        10**x,
+        10**y,
+        xerr=[10**x - 10 ** (x - xloerr), 10 ** (x + xhierr) - 10**x],
+        yerr=[10**y - 10 ** (y - 0.4), 10 ** (y + 0.4) - 10**y],
         marker="o",
         linestyle="none",
         ms=10,
@@ -248,8 +254,16 @@ def show_observed_LRD(ax):
         capthick=2,
         lw=2,
         capsize=5,
-        label=r"$\rm Ding+23$",
+        label="Ding+23",
     )
 
-    ax.legend(fontsize=20, loc=2)
-    ax.add_artist(leg1)
+    ax.legend(
+        loc=legend_loc,
+        ncol=1,
+        handletextpad=0.5,
+        handlelength=1.0,
+        columnspacing=0.5,
+        labelspacing=0.25,
+        # fontsize=24,
+    )
+    # ax.add_artist(leg1)
