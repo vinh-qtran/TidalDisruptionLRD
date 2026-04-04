@@ -2,7 +2,7 @@ import numpy as np
 from astropy import units as u
 from tqdm import tqdm
 
-from tidaldisruptionlrd.constants import G, Rsun
+from tidaldisruptionlrd.constants import G, Rsun, c
 
 
 class BaseTDERate:
@@ -270,13 +270,19 @@ class BaseTDERate:
 
         _r_t_bins = self._get_r_t_bins(self._m_s_bins, M_bh)
 
+        _r_g = G * M_bh / c**2
+
         _N_TDE_bins = []
         for _r_t in _r_t_bins:
             _q_bins = self._get_q_bins(M_bh, _r_t, r_h)
             _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h)
             _F_bar_bins = self._get_F_bar_bins(_ln_R0_bins, M_bh)
 
-            _N_TDE_bins.append(np.trapezoid(_F_bar_bins, self._epsilon_bar_bins))
+            _N_TDE_bins.append(
+                np.trapezoid(_F_bar_bins, self._epsilon_bar_bins)
+                if _r_t > 2 * _r_g
+                else 0
+            )
 
         return np.array(_N_TDE_bins)
 
@@ -350,14 +356,14 @@ class SalpeterTDERate(BaseTDERate):
     Class for calculating the TDE rate for a Salpeter mass function stellar population.
     """
 
-    def __init__(self, m_s_max=1, m_s_min=0.08, *args, **kwargs):
+    def __init__(self, m_s_max=2, m_s_min=0.08, *args, **kwargs):
         """
         Initialize the TDE rate class.
 
         Parameters:
         ----------
         m_s_max: float
-            The maximum stellar mass in M_sun. Default is 1 M_sun, the turnoff mass for a 10 Gyr old population.
+            The maximum stellar mass in M_sun. Default is 2 M_sun, the turnoff mass for a 10 Gyr old population.
         m_s_min: float
             The minimum stellar mass in M_sun. Default is 0.08 M_sun, the hydrogen burning limit.
         """
@@ -380,14 +386,14 @@ class KroupaTDERate(BaseTDERate):
     Class for calculating the TDE rate for a Kroupa mass function stellar population.
     """
 
-    def __init__(self, m_s_max=1, m_s_min=0.08, *args, **kwargs):
+    def __init__(self, m_s_max=2, m_s_min=0.08, *args, **kwargs):
         """
         Initialize the TDE rate class.
 
         Parameters:
         ----------
         m_s_max: float
-            The maximum stellar mass in M_sun. Default is 1 M_sun, the turnoff mass for a 10 Gyr old population.
+            The maximum stellar mass in M_sun. Default is 2 M_sun, the turnoff mass for a 10 Gyr old population.
         m_s_min: float
             The minimum stellar mass in M_sun. Default is 0.08 M_sun, the hydrogen burning limit.
         """

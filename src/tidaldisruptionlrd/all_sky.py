@@ -7,7 +7,12 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import norm
 from tqdm import tqdm
 
-from tidaldisruptionlrd.constants import G, z45_shell_volume, z56_shell_volume
+from tidaldisruptionlrd.constants import (
+    G,
+    G25_number_density,
+    z45_shell_volume,
+    z56_shell_volume,
+)
 from tidaldisruptionlrd.stellar_distribution import PowerLawProfile
 
 # 1. Get the root string
@@ -26,12 +31,9 @@ class TDEGrid:
         tde,
         M_bhs,
         M_s_scalers,
-        m_s_max=1,
-        a=None,
-        sigma_coeff=None,
-        sigma=None,
-        sigma_params={"M200": 3.09e8, "p": 4.38},  # noqa: B006
-        a_params={"M0": 1e9, "a0": 0.055, "alpha": 0.75},  # noqa: B006
+        m_s_max=2,
+        profile_params={},  # noqa: B006
+        a_params={"M0": 3.16e8, "a0": 0.381, "alpha": 0.27},  # noqa: B006
     ):
         """
         Initialize the TDEGrid class, which computes TDE rates for a grid of black hole masses and stellar mass scalers.
@@ -42,26 +44,22 @@ class TDEGrid:
             The profile function to be used for computing TDE rates.
         tde : callable
             The TDE function to be used for computing TDE rates.
+
         M_bhs : array-like
             The black hole masses for which to compute TDE rates.
         M_s_scalers : array-like
             The stellar mass scalers for which to compute TDE rates.
         m_s_max : float, optional
-            The maximum stellar mass for which to compute TDE rates. If not provided, it is set to 1 by default.
-        a : float, optional
-            The scale radii for which to compute TDE rates. If not provided, it is computed using the sigma coefficient and the M-sigma relation.
-        sigma_coeff : float, optional
-            The sigma coefficient to be used in computing the scale radius, defined as a = sigma_coeff * G * M_s / sigma^2.
-            If not provided, a is computed using the M-a relation from van de Wel et al. (2014).
-        sigma : float, optional
-            The sigma value to be used in computing scale radius. If not provided, it is computed using the M-sigma relation.
-        sigma_params : dict, optional
-            The parameters for the M-sigma relation, with keys "M200" and "p". If not provided, default values are used.
+            The maximum stellar mass for which to compute TDE rates. If not provided, it is set to 2 by default.
+
+        profile_params : dict, optional
+            The parameters for the profile function, with keys depending on the specific profile used. If not provided, an empty dictionary is used.
+
         a_params : dict, optional
             The parameters for the M-a relation, with keys "M0", "a0", and "alpha". If not provided, default values are used.
         """
 
-        self.sigma_params = sigma_params
+        self.profile_params = profile_params
         self.a_params = a_params
 
         self.profile = profile
@@ -71,30 +69,19 @@ class TDEGrid:
         self.M_s_scalers = M_s_scalers
         self.m_s_max = m_s_max
 
-        self.a = a
-
-        self.sigma_coeff = sigma_coeff
-
-        self.sigma = sigma or self._get_sigma(M_bhs, **sigma_params)
-
         _N_TDEs = []
         for _M_s_scaler in tqdm(self.M_s_scalers):
             _N_TDEs.append(self._get_single_TDE_rates(_M_s_scaler))  # noqa: PERF401
 
         self.N_TDEs = np.vstack(_N_TDEs)
 
-    def _get_sigma(self, M_bh, M200, p):
-        return 200 * (M_bh / M200) ** (1 / p)
-
-    def _get_a_from_sigma(self, sigma_coeff, M_s, sigma):
-        return sigma_coeff * G * M_s / sigma**2
-
-    def _get_a_from_Mstar(self, M_s, M0, a0, alpha):
+    def _get_a(self, M_s, M0, a0, alpha):
         return a0 * (M_s / M0) ** alpha
 
     def _get_single_TDE_rates(self, M_s_scaler):
         _profile = self.profile(
             M_s_scaler,
+            **self.profile_params,
             r_bin_min=1e-4,
             r_bin_max=1e6,
             N_bins=1000,
@@ -103,14 +90,7 @@ class TDEGrid:
             show_progress=False,
         )
 
-        if self.a is not None:
-            _as = np.full_like(self.M_bhs, self.a)
-        elif self.sigma_coeff is not None:
-            _as = self._get_a_from_sigma(
-                self.sigma_coeff, self.M_bhs * M_s_scaler, self.sigma
-            )
-        else:
-            _as = self._get_a_from_Mstar(self.M_bhs * M_s_scaler, **self.a_params)
+        _as = self._get_a(self.M_bhs * M_s_scaler, **self.a_params)
 
         _r_hs = _as / _profile.a
 
@@ -133,7 +113,7 @@ class IsothermalTDEGrid:
         tde,
         M_bhs,
         M_s_scalers,
-        m_s_max=1,
+        m_s_max=2,
         sigma_params={"M200": 3.09e8, "p": 4.38},  # noqa: B006
     ):
         self.sigma_params = sigma_params
@@ -240,15 +220,15 @@ class LRDNum:
             delta_log_Ms_scaler * self._log_Ms_scatters[Ms_Mbh_type]
         )
 
-        if BHMF_type in ["Greene25", "uniform"]:
+        if BHMF_type == "uniform":
+            self.BHMF_bins = np.full_like(log_Mbh_bins, G25_number_density) / (
+                log_Mbh_bins[-1] - log_Mbh_bins[0]
+            )
+
+        elif BHMF_type == "Greene25":
             self._read_Greene25_DF()
 
-            if BHMF_type == "uniform":
-                self.BHMF_bins = np.trapezoid(
-                    self._Greene25_BHMF_interp(log_Mbh_bins), log_Mbh_bins
-                ) / np.full_like(log_Mbh_bins, log_Mbh_bins[-1] - log_Mbh_bins[0])
-            else:
-                self.BHMF_bins = self._Greene25_BHMF_interp(log_Mbh_bins)
+            self.BHMF_bins = self._Greene25_BHMF_interp(log_Mbh_bins)
 
         elif BHMF_type.split("_")[0] == "Inayoshi24":
             self._read_Inayoshi24_DF(self._Inayoshi24_files[BHMF_type])
