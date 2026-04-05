@@ -373,10 +373,10 @@ class SalpeterTDERate(BaseTDERate):
 
         super().__init__(*args, **kwargs)
 
-    def _get_mass_function_bins(self, m_s_bins):
+    def _get_mass_function_bins(self, m_s_bins, A=0.0452):
         return np.where(
             (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
-            0.046 * m_s_bins ** (-2.35),  # m_s_min < m < m_s_max
+            A * m_s_bins ** (-2.35),  # m_s_min < m < m_s_max
             0,  # otherwise
         )
 
@@ -403,13 +403,13 @@ class KroupaTDERate(BaseTDERate):
 
         super().__init__(*args, **kwargs)
 
-    def _get_mass_function_bins(self, m_s_bins):
+    def _get_mass_function_bins(self, m_s_bins, A=0.2633):
         return np.where(
             (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
             np.where(
                 m_s_bins < 0.5,
-                0.98 * m_s_bins ** (-1.3),  # m_s_min < m < 0.5
-                2.4 * m_s_bins ** (-2.3),  # 0.5 < m < m_s_max
+                A * m_s_bins ** (-1.3),  # m_s_min < m < 0.5
+                A / 2 * m_s_bins ** (-2.3),  # 0.5 < m < m_s_max
             ),
             0,  # otherwise
         )

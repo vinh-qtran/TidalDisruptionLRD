@@ -10,3 +10,5 @@ z45_shell_volume = (Planck18.comoving_volume(5) - Planck18.comoving_volume(4)).v
 z56_shell_volume = (Planck18.comoving_volume(6) - Planck18.comoving_volume(5)).value
 
 G25_number_density = 1.06145e-05 + 7.61923e-05 + 3.27835e-05
+
+all_sky_deg_sqr = 41252.96

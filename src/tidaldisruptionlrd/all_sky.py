@@ -187,12 +187,20 @@ def P23_logMs_from_logMbh(log_Mbh):
     return (2.43 + log_Mbh) / 1.06
 
 
+def L25_logMs_from_logMbh(log_Mbh):
+    """
+    The M_bh-Ms relation from Li (2025).
+    """
+    return (3.32 + log_Mbh) / 1.02
+
+
 class LRDNum:
     _logMs_from_logMbh_funcs = {  # noqa: RUF012
         "KH13": KH13_logMs_from_logMbh,
         "RV15": RV15_logMs_from_logMbh,
         "G20": G20_logMs_from_logMbh,
         "P23": P23_logMs_from_logMbh,
+        "L25": L25_logMs_from_logMbh,
     }
 
     _log_Ms_scatters = {  # noqa: RUF012
@@ -200,6 +208,7 @@ class LRDNum:
         "RV15": 0.24 / 1.05,
         "G20": 0.79 / 1.39,
         "P23": 0.69 / 1.06,
+        "L25": 0.97 / 1.02,
     }
 
     _Inayoshi24_files = {  # noqa: RUF012
@@ -224,6 +233,9 @@ class LRDNum:
             self.BHMF_bins = np.full_like(log_Mbh_bins, G25_number_density) / (
                 log_Mbh_bins[-1] - log_Mbh_bins[0]
             )
+
+            if Ms_Mbh_type == "L25":
+                self.BHMF_bins /= 0.09
 
         elif BHMF_type == "Greene25":
             self._read_Greene25_DF()
