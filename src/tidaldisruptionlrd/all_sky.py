@@ -10,7 +10,9 @@ from tqdm import tqdm
 from tidaldisruptionlrd.constants import (
     G,
     G25_number_density,
+    z45_dilation_factor,
     z45_shell_volume,
+    z56_dilation_factor,
     z56_shell_volume,
 )
 from tidaldisruptionlrd.stellar_distribution import PowerLawProfile
@@ -205,7 +207,7 @@ class LRDNum:
 
     _log_Ms_scatters = {  # noqa: RUF012
         "KH13": 0.29 / 1.16,
-        "RV15": 0.24 / 1.05,
+        "RV15": 0.55 / 1.05,
         "G20": 0.79 / 1.39,
         "P23": 0.69 / 1.06,
         "L25": 0.97 / 1.02,
@@ -383,4 +385,7 @@ class AllSkyTDERate:
             self.tde_rate_Mbh_bins
             * self._BHMF_bins
             * (self._log_Mbh_bins[1] - self._log_Mbh_bins[0])
-        ) * (z45_shell_volume + z56_shell_volume)
+        ) * (
+            z45_shell_volume * z45_dilation_factor
+            + z56_shell_volume * z56_dilation_factor
+        )

@@ -153,8 +153,21 @@ class BaseTDERate:
         r_t_bins: array
             Array of tidal radius bins in kpc.
         """
+        m_mid = 1.66
 
-        return Rsun * self._eta ** (2 / 3) * (m_s_bins / M_bh) ** 0.467 * M_bh**0.8
+        def _r_t_scaler(alpha):
+            return (m_s_bins / M_bh) ** (alpha - 1 / 3) * (M_bh / m_mid) ** alpha
+
+        return (
+            Rsun
+            * m_mid**0.8
+            * self._eta ** (2 / 3)
+            * np.where(
+                m_s_bins < m_mid,
+                _r_t_scaler(0.8),  # m < 1.66 M_sun, R ~ M^0.8
+                _r_t_scaler(0.57),  # m > 1.66 M_sun, R ~ M^0.57
+            )
+        )
 
     def _get_q_bins(self, M_bh, r_t, r_h):
         """
@@ -373,10 +386,10 @@ class SalpeterTDERate(BaseTDERate):
 
         super().__init__(*args, **kwargs)
 
-    def _get_mass_function_bins(self, m_s_bins, A=0.0452):
+    def _get_mass_function_bins(self, m_s_bins):
         return np.where(
             (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
-            A * m_s_bins ** (-2.35),  # m_s_min < m < m_s_max
+            m_s_bins ** (-2.35),  # m_s_min < m < m_s_max
             0,  # otherwise
         )
 
@@ -403,13 +416,13 @@ class KroupaTDERate(BaseTDERate):
 
         super().__init__(*args, **kwargs)
 
-    def _get_mass_function_bins(self, m_s_bins, A=0.2633):
+    def _get_mass_function_bins(self, m_s_bins):
         return np.where(
             (m_s_bins >= self._m_s_min) & (m_s_bins <= self._m_s_max),
             np.where(
                 m_s_bins < 0.5,
-                A * m_s_bins ** (-1.3),  # m_s_min < m < 0.5
-                A / 2 * m_s_bins ** (-2.3),  # 0.5 < m < m_s_max
+                m_s_bins ** (-1.3),  # m_s_min < m < 0.5
+                0.5 * m_s_bins ** (-2.3),  # 0.5 < m < m_s_max
             ),
             0,  # otherwise
         )
