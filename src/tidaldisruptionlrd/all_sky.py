@@ -236,8 +236,12 @@ class LRDNum:
                 log_Mbh_bins[-1] - log_Mbh_bins[0]
             )
 
-            if Ms_Mbh_type == "L25":
-                self.BHMF_bins /= 0.09
+        elif BHMF_type == "gaussian":
+            self.BHMF_bins = (
+                norm.pdf(log_Mbh_bins, loc=log_Mbh_bins.mean(), scale=1)
+                * G25_number_density
+                / (norm.cdf(1) - norm.cdf(-1))
+            )
 
         elif BHMF_type == "Greene25":
             self._read_Greene25_DF()
@@ -250,6 +254,9 @@ class LRDNum:
 
         else:
             raise ValueError("Invalid BHMF_type.")  # noqa: EM101, TRY003
+
+        if Ms_Mbh_type == "L25":
+            self.BHMF_bins /= 0.09
 
         self.p_delta_log_Ms_bins = (
             norm.pdf(delta_log_Ms_scaler) / self._log_Ms_scatters[Ms_Mbh_type]
