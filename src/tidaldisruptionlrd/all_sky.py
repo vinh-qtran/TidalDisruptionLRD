@@ -8,14 +8,12 @@ from scipy.stats import norm
 from tqdm import tqdm
 
 from tidaldisruptionlrd.constants import (
-    G,
     G25_number_density,
     z45_dilation_factor,
     z45_shell_volume,
     z56_dilation_factor,
     z56_shell_volume,
 )
-from tidaldisruptionlrd.stellar_distribution import PowerLawProfile
 
 # 1. Get the root string
 repo_root_str = subprocess.run(
@@ -34,6 +32,7 @@ class TDEGrid:
         M_bhs,
         M_s_scalers,
         m_s_max=2,
+        r_env=None,
         profile_params={},  # noqa: B006
         a_params={"M0": 3.16e8, "a0": 0.381, "alpha": 0.27},  # noqa: B006
     ):
@@ -54,6 +53,9 @@ class TDEGrid:
         m_s_max : float, optional
             The maximum stellar mass for which to compute TDE rates. If not provided, it is set to 2 by default.
 
+        r_env: array, optional
+            Array of gas envelope radius in kpc. If given, it will be used instead of the tidal radius for the TDE rate calculation. Default is None.
+
         profile_params : dict, optional
             The parameters for the profile function, with keys depending on the specific profile used. If not provided, an empty dictionary is used.
 
@@ -61,15 +63,17 @@ class TDEGrid:
             The parameters for the M-a relation, with keys "M0", "a0", and "alpha". If not provided, default values are used.
         """
 
-        self.profile_params = profile_params
-        self.a_params = a_params
+        self._profile_params = profile_params
+        self._a_params = a_params
 
-        self.profile = profile
-        self.tde = tde
+        self._profile = profile
+        self._tde = tde
 
         self.M_bhs = M_bhs
         self.M_s_scalers = M_s_scalers
-        self.m_s_max = m_s_max
+        self._m_s_max = m_s_max
+
+        self._r_env = r_env
 
         _N_TDEs = []
         for _M_s_scaler in tqdm(self.M_s_scalers):
@@ -81,9 +85,9 @@ class TDEGrid:
         return a0 * (M_s / M0) ** alpha
 
     def _get_single_TDE_rates(self, M_s_scaler):
-        _profile = self.profile(
+        _profile = self._profile(
             M_s_scaler,
-            **self.profile_params,
+            **self._profile_params,
             r_bin_min=1e-4,
             r_bin_max=1e6,
             N_bins=1000,
@@ -92,70 +96,19 @@ class TDEGrid:
             show_progress=False,
         )
 
-        _as = self._get_a(self.M_bhs * M_s_scaler, **self.a_params)
+        _as = self._get_a(self.M_bhs * M_s_scaler, **self._a_params)
 
         _r_hs = _as / _profile.a
 
-        _tde = self.tde(
-            m_s_max=self.m_s_max,
+        _tde = self._tde(
+            m_s_max=self._m_s_max,
             dimensionless_profile=_profile,
             M_bhs=self.M_bhs,
             r_hs=_r_hs,
             m_s_bins=np.linspace(0.08, 10, 1000),
             eta=0.844,
+            r_env=self._r_env,
             show_progress=False,
-        )
-
-        return _tde.N_TDEs
-
-
-class IsothermalTDEGrid:
-    def __init__(
-        self,
-        tde,
-        M_bhs,
-        M_s_scalers,
-        m_s_max=2,
-        sigma_params={"M200": 3.09e8, "p": 4.38},  # noqa: B006
-    ):
-        self.sigma_params = sigma_params
-
-        self.tde = tde
-
-        self.M_bhs = M_bhs
-        self.M_s_scalers = M_s_scalers
-        self.m_s_max = m_s_max
-
-        self.sigma = self._get_sigma(M_bhs, **sigma_params)
-
-        _N_TDEs = [self._get_single_TDE_rates()] * len(self.M_s_scalers)
-
-        self.N_TDEs = np.vstack(_N_TDEs)
-
-    def _get_sigma(self, M_bh, M200, p):
-        return 200 * (M_bh / M200) ** (1 / p)
-
-    def _get_single_TDE_rates(self):
-        _profile = PowerLawProfile(
-            gamma=2,
-            r_bin_min=1e-4,
-            r_bin_max=1e6,
-            N_bins=1000,
-            reduce_factor=10,
-            N_trapz_bins=100,
-            show_progress=True,
-        )
-
-        _r_hs = G * self.M_bhs / self.sigma**2 / 2
-
-        _tde = self.tde(
-            m_s_max=self.m_s_max,
-            dimensionless_profile=_profile,
-            M_bhs=self.M_bhs,
-            r_hs=_r_hs,
-            m_s_bins=np.linspace(0.08, 10, 1000),
-            eta=0.844,
-            show_progress=True,
         )
 
         return _tde.N_TDEs

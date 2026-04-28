@@ -13,6 +13,7 @@ class BaseTDERate:
         r_hs,
         m_s_bins=np.linspace(0.08, 2, 1000),  # noqa: B008
         eta=0.844,
+        r_env=None,
         show_progress=True,
     ):
         """
@@ -34,6 +35,9 @@ class BaseTDERate:
         eta: float, optional
             The tidal disruption parameter, eta=0.844 for n=3 polytrope. Default is 0.844.
 
+        r_env: array, optional
+            Array of gas envelope radius in kpc. If given, it will be used instead of the tidal radius for the TDE rate calculation. Default is None.
+
         show_progress: bool, optional
             Whether to show the progress bar for the TDE rate calculation. Default is True.
         """
@@ -46,6 +50,8 @@ class BaseTDERate:
         self.r_hs = r_hs
 
         self._eta = eta
+
+        self._r_env = r_env
 
         self._m_s_bins = m_s_bins
         self._mass_func_bins = self._get_mass_function_bins(m_s_bins)
@@ -281,7 +287,11 @@ class BaseTDERate:
             Array of N_TDE bins.
         """
 
-        _r_t_bins = self._get_r_t_bins(self._m_s_bins, M_bh)
+        _r_t_bins = (
+            np.full_like(self._m_s_bins, self._r_env)
+            if self._r_env is not None
+            else self._get_r_t_bins(self._m_s_bins, M_bh)
+        )
 
         _r_g = G * M_bh / c**2
 
@@ -290,6 +300,8 @@ class BaseTDERate:
             _q_bins = self._get_q_bins(M_bh, _r_t, r_h)
             _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h)
             _F_bar_bins = self._get_F_bar_bins(_ln_R0_bins, M_bh)
+
+            _F_bar_bins = np.nan_to_num(_F_bar_bins, nan=0.0)
 
             _N_TDE_bins.append(
                 np.trapezoid(_F_bar_bins, self._epsilon_bar_bins)
@@ -317,7 +329,11 @@ class BaseTDERate:
         F_bar_bins: array
             Array of F_bar bins.
         """
-        _r_t_bins = self._get_r_t_bins(self._m_s_bins, M_bh)
+        _r_t_bins = (
+            np.full_like(self._m_s_bins, self._r_env)
+            if self._r_env is not None
+            else self._get_r_t_bins(self._m_s_bins, M_bh)
+        )
 
         _F_bar_bins = []
         for _r_t in _r_t_bins:
