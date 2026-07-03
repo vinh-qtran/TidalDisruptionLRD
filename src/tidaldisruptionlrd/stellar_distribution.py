@@ -72,8 +72,8 @@ class BaseProfile:
 
         Returns:
         -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
+        stellar_rho_bins: array
+            Array of stellar density bins in scale_mass / scale_length^3.
         """
 
         raise NotImplementedError("Not implemented in base class.")  # noqa: EM101
@@ -120,6 +120,35 @@ class BaseProfile:
         _delta_phi_bins = cumulative_trapezoid(_delta_phi_integrand, r_bins, initial=0)
 
         return _delta_phi_bins - _delta_phi_bins[-1]
+
+    def _get_stellar_Sigma_bins(self, r_bins):
+        stellar_Sigma_bins = np.zeros_like(r_bins)
+
+        for i, R in enumerate(r_bins):
+
+            def _Sigma_integrand(r):
+                return 2 * r * self._get_stellar_rho_bins(r) / np.sqrt(r**2 - R**2)  # noqa: B023
+
+            stellar_Sigma_bins[i] = quad(_Sigma_integrand, R, np.inf)[0]
+
+        return stellar_Sigma_bins
+
+    def get_2D_half_mass_radius(self):
+        _r_bins = self.r_bins
+        _stellar_Sigma_bins = self._get_stellar_Sigma_bins(_r_bins)
+
+        _stellar_2D_mass_integrand = 2 * np.pi * _r_bins * _stellar_Sigma_bins
+        _stellar_2D_mass_bins = cumulative_trapezoid(
+            _stellar_2D_mass_integrand, _r_bins, initial=0
+        )
+
+        return np.exp(
+            np.interp(
+                np.log(0.5 * _stellar_2D_mass_bins[-1]),
+                np.log(_stellar_2D_mass_bins[1:]),
+                np.log(_r_bins[1:]),
+            )
+        )
 
     def _get_Eddington_bins(self, rho_bins, phi_bins):
         """
@@ -438,25 +467,6 @@ class BaseProfile:
         )
 
 
-class SingularIsothermalSphereProfile(BaseProfile):
-    def _get_stellar_rho_bins(self, r_bins):
-        """
-        Get the stellar density profile of the singular isothermal sphere halo.
-
-        Parameters:
-        ----------
-        r_bins: array
-            Array of radius bins in scale_length.
-
-        Returns:
-        -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
-        """
-
-        return 1 / (2 * np.pi * r_bins**2)
-
-
 class PowerLawProfile(BaseProfile):
     def __init__(self, gamma, *args, **kwargs):
         """
@@ -493,138 +503,18 @@ class PowerLawProfile(BaseProfile):
         return (3 - self.gamma) / (4 * np.pi) / r_bins**self.gamma
 
 
-class PlummerCuspProfile(BaseProfile):
-    def __init__(self, M_s, n=4, *args, **kwargs):
-        """
-        Initialize the Plummer cusp profile class. The Plummer cusp profile is defined
-        as a Plummer profile with a Bahcall-Wolf cusp inside the radius of influence.
-        The scale length is [fill in info]
-
-        Parameters:
-        ----------
-        M_s: float
-            The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
-        n: int, optional
-            The power law slope scaler of the inner cusp. Default is 4.
-        """
-
-        self.M_s = M_s
-        self.a = self._get_a(M_s)
-
-        self._n = n
-
-        super().__init__(*args, **kwargs)
-
-    def _get_a(self, M_s):
-        """
-        Get the scale radius of the Plummer cusp profile.
-
-        Parameters:
-        ----------
-        M_s: float
-            The total stellar mass of the halo in scale_mass (i.e. the mass of the
-            central black hole).
-
-        Returns:
-        -------
-        a: float
-            The scale radius in scale_length.
-        """
-
-        return (2.620 * M_s) ** (1 / 3)
-
-    def _get_stellar_rho_bins(self, r_bins):
-        """
-        Get the stellar density profile of the Plummer cusp halo.
-
-        Parameters:
-        ----------
-        r_bins: array
-            Array of radius bins in scale_length.
-
-        Returns:
-        -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
-        """
-
-        return (
-            3
-            * self.M_s
-            / (4 * np.pi * self.a**3)
-            * r_bins ** (-7 / 4)
-            * (1 + r_bins**self._n) ** (7 / 4 / self._n)
-            * (1 + (r_bins / self.a) ** 2) ** (-5 / 2)
-        )
-
-
-class HernquistProfile(BaseProfile):
-    def __init__(self, M_s, *args, **kwargs):
-        """
-        Initialize the Hernquist profile class. The scale length (i.e. the influent radius
-        of the central black hole) is defined as the radius where the enclosed stellar mass
-        is equal to the mass of the central black hole, i.e. M_s(<r_h) = M_s.
-        This gives a stellar scale radius of a = sqrt(M_s) - 1 in scale length.
-
-        Parameters:
-        ----------
-        M_s: float
-            The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
-        """
-
-        self.M_s = M_s
-        self.a = self._get_a(M_s)
-
-        super().__init__(*args, **kwargs)
-
-    def _get_a(self, M_s):
-        """
-        Get the scale radius of the Hernquist profile.
-
-        Parameters:
-        ----------
-        M_s: float
-            The total stellar mass of the halo in scale_mass (i.e. the mass of the
-            central black hole).
-
-        Returns:
-        -------
-        a: float
-            The scale radius in scale_length.
-        """
-
-        return min(max(np.sqrt(M_s) - 1, 1e-3), 1e3)
-
-    def _get_stellar_rho_bins(self, r_bins):
-        """
-        Get the stellar density profile of the Hernquist halo.
-
-        Parameters:
-        ----------
-        r_bins: array
-            Array of radius bins in scale_length.
-
-        Returns:
-        -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
-        """
-
-        return self.M_s / (2 * np.pi) * self.a / r_bins / (r_bins + self.a) ** 3
-
-
 class DehnenProfile(BaseProfile):
     def __init__(self, M_s, gamma, *args, **kwargs):
         """
         Initialize the Dehnen profile class. The scale length (i.e. the influent radius
         of the central black hole) is defined as the radius where the enclosed stellar mass
-        is equal to the mass of the central black hole, i.e. M_s(<r_h) = M_s.
+        is equal to the mass of the central black hole, which is also the scale mass, i.e. M_s(<r_h) = 1.
         This gives a stellar scale radius of a = M_s**(1 / (3 - gamma)) - 1 in scale length.
 
         Parameters:
         ----------
         M_s: float
-            The total stellar mass of the halo in scale_mass (i.e. the mass of the central black hole).
+            The total stellar mass of the halo in scale_mass.
         gamma: float
             The inner slope of the Dehnen profile.
         """
@@ -665,8 +555,8 @@ class DehnenProfile(BaseProfile):
 
         Returns:
         -------
-        rho_bins: array
-            Array of density bins in scale_mass / scale_length^3.
+        stellar_rho_bins: array
+            Array of stellar density bins in scale_mass / scale_length^3.
         """
 
         return (
@@ -676,4 +566,165 @@ class DehnenProfile(BaseProfile):
             * self.a
             / r_bins**self.gamma
             / (r_bins + self.a) ** (4 - self.gamma)
+        )
+
+
+class DehnenCuspProfile(BaseProfile):
+    def __init__(self, M_s, gamma, *args, **kwargs):
+        """
+        Initialize the Dehnen cusp profile class, i.e. the Dehnen profile with a
+        Bahcal-Wolf cusp inside the radius of influence. The scale length (i.e. the
+        influent radius of the central black hole) is defined as the radius where
+        the enclosed stellar mass is equal to the mass of the central black hole,
+        which is also the scale mass, i.e. M_s(<r_h) = 1.
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass.
+        gamma: float
+            The inner slope of the Dehnen profile.
+        """
+
+        self.M_s = M_s
+        self.gamma = gamma
+
+        self.r_h_bar, self._M_norm = self._get_r_h_bar_and_M_norm(M_s)
+        self.a = self._get_a(self.r_h_bar)
+
+        super().__init__(*args, **kwargs)
+
+    def _get_stellar_rho_bar_bins(self, r_bar_bins, r_h_bar, beta=4):
+        """
+        Get the unnormalized scaled stellar density profile of the Dehnen cusp halo.
+
+        Parameters:
+        ----------
+        r_bar_bins: array
+            Array of scaled radius bins in scale radius a.
+        r_h_bar: float
+            The scaled influence radius in scale radius a.
+        beta: float, optional
+            The power law slope scaler of the inner cusp. Default is 4.
+
+        Returns:
+        -------
+        rho_bar_bins: array
+            Array of unormalized scaled density bins in stellar mass divided by the normalization mass and scale radius cubed.
+        """
+
+        return (
+            (r_bar_bins / r_h_bar) ** (self.gamma - 7 / 4)
+            * (1 + (r_bar_bins / r_h_bar) ** beta) ** ((7 / 4 - self.gamma) / beta)
+            / r_bar_bins**self.gamma
+            / (1 + r_bar_bins) ** (4 - self.gamma)
+        )
+
+    def _get_M_h_bar_and_M_norm(self, r_h_bar):
+        """
+        Get the portion of mass within the influence radius and the normalization mass for the Dehnen cusp halo.
+
+        Parameters:
+        ----------
+        r_h_bar: float
+            The scaled influence radius in scale radius a.
+
+        Returns:
+        -------
+        M_h_bar: float
+            The portion of mass within the influence radius.
+        M_norm: float
+            The normalization mass.
+        """
+
+        _r_bar_bins = np.logspace(-8, 0, 1000) * r_h_bar
+        _r_bar_bins_extended = np.logspace(-8, 8, 2000) * r_h_bar
+
+        _rho_bins = self._get_stellar_rho_bar_bins(_r_bar_bins, r_h_bar)
+        _rho_bins_extended = self._get_stellar_rho_bar_bins(
+            _r_bar_bins_extended, r_h_bar
+        )
+
+        M_h = 4 * np.pi * np.trapezoid(_rho_bins * _r_bar_bins**2, _r_bar_bins)
+        M_norm = (
+            4
+            * np.pi
+            * np.trapezoid(
+                _rho_bins_extended * _r_bar_bins_extended**2, _r_bar_bins_extended
+            )
+        )
+
+        return M_h / M_norm, M_norm
+
+    def _get_r_h_bar_and_M_norm(self, M_s):
+        """
+        Get the scaled influence radius and the normalization mass for the Dehnen cusp halo.
+
+        Parameters:
+        ----------
+        M_s: float
+            The total stellar mass of the halo in scale_mass.
+
+        Returns:
+        -------
+        r_h_bar: float
+            The scaled influence radius in scale radius a.
+        M_norm: float
+            The normalization mass.
+        """
+
+        _r_h_bar_bins = np.logspace(-5, 5, 100)
+        _M_h_bar_bins = np.zeros_like(_r_h_bar_bins)
+        _M_norm_bins = np.zeros_like(_r_h_bar_bins)
+
+        for i, _r_h_bar in enumerate(_r_h_bar_bins):
+            _M_h_bar_bins[i], _M_norm_bins[i] = self._get_M_h_bar_and_M_norm(_r_h_bar)
+
+        r_h_bar = np.exp(
+            np.interp(np.log(1 / M_s), np.log(_M_h_bar_bins), np.log(_r_h_bar_bins))
+        )
+        M_norm = np.exp(
+            np.interp(np.log(1 / M_s), np.log(_M_h_bar_bins), np.log(_M_norm_bins))
+        )
+
+        return r_h_bar, M_norm
+
+    def _get_a(self, r_h_bar):
+        """
+        Get the scale radius of the Dehnen cusp profile.
+
+        Parameters:
+        ----------
+        r_h_bar: float
+            The scaled influence radius in scale radius a.
+
+        Returns:
+        -------
+        a: float
+            The scale radius in scale_length.
+        """
+
+        return min(max(1 / r_h_bar, 1e-3), 1e3)
+
+    def _get_stellar_rho_bins(self, r_bins):
+        """
+        Get the stellar density profile of the Dehnen cusp halo.
+
+        Parameters:
+        ----------
+        r_bins: array
+            Array of radius bins in scale_length.
+
+        Returns:
+        -------
+        stellar_rho_bins: array
+            Array of stellar density bins in scale_mass / scale_length^3.
+        """
+
+        _r_bar_bins = r_bins / self.a
+        return (
+            self.M_s
+            / self._M_norm
+            / self.a**3
+            * self._get_stellar_rho_bar_bins(_r_bar_bins, self.r_h_bar)
         )

@@ -3,6 +3,7 @@ from astropy import units as u
 from tqdm import tqdm
 
 from tidaldisruptionlrd.constants import G, Rsun, c
+from tidaldisruptionlrd.utils import get_interp
 
 
 class BaseTDERate:
@@ -96,12 +97,46 @@ class BaseTDERate:
             Array of h(epsilon) bins.
         _Jc_sqr_bar_bins: array
             Array of dimensionless Jc^2 bins.
+        _r_bins: array
+            Array of dimensionless radius bins.
+        _phi_bins: array
+            Array of dimensionless potential bins.
+        _log_log_psi_interp: function
+            Interpolation function for log(-phi) as a function of log(r)
         """
 
         self._epsilon_bar_bins = dimensionless_profile.reduced_epsilon_bins
         self._g_bar_bins = dimensionless_profile.reduced_g_epsilon_bins
         self._h_bar_bins = dimensionless_profile.reduced_h_epsilon_bins
         self._Jc_sqr_bar_bins = dimensionless_profile.reduced_Jc_sqr_bins
+
+        self._r_bins = dimensionless_profile.r_bins
+        self._phi_bins = dimensionless_profile.phi_bins
+
+        self._log_log_psi_interp = get_interp(
+            np.log(self._r_bins), np.log(-self._phi_bins)
+        )
+
+    def _get_psi_t_bar_bins(self, r_t_bar_bins):
+        """
+        Get the dimensionless negative potential at the tidal radius bins for the TDE rate calculation.
+
+        Parameters:
+        ----------
+        r_t_bar_bins: array
+            Array of dimensionless tidal radius bins, r_t_bar = r_t / r_h.
+
+        Returns:
+        -------
+        psi_t_bins: array
+            Array of dimensionless negative potential at the tidal radius bins.
+        """
+
+        return np.where(
+            r_t_bar_bins > 1e-2,
+            np.exp(self._log_log_psi_interp(np.log(r_t_bar_bins))),
+            1 / r_t_bar_bins,
+        )
 
     def _get_mass_function_bins(self, m_s_bins):
         """
@@ -175,7 +210,7 @@ class BaseTDERate:
             )
         )
 
-    def _get_q_bins(self, M_bh, r_t, r_h):
+    def _get_q_bins(self, M_bh, r_t, r_h, psi_t_bar):
         """
         Get the q bins for the TDE rate calculation.
 
@@ -187,6 +222,8 @@ class BaseTDERate:
             Tidal radius in kpc.
         r_h: float
             Influence radius in kpc.
+        psi_t_bar: array
+            Dimensionless negative potential at the tidal radius.
 
         Returns:
         -------
@@ -205,11 +242,9 @@ class BaseTDERate:
             * (r_t / r_h) ** (-2)
         )
 
-        return (
-            _scaler * self._h_bar_bins / ((r_t / r_h) ** (-1) - self._epsilon_bar_bins)
-        )
+        return _scaler * self._h_bar_bins / (psi_t_bar - self._epsilon_bar_bins)
 
-    def _get_ln_R0_bins(self, q_bins, r_t, r_h):
+    def _get_ln_R0_bins(self, q_bins, r_t, r_h, psi_t_bar):
         """
         Get the natural log R0 bins for the TDE rate calculation.
 
@@ -221,6 +256,8 @@ class BaseTDERate:
             Tidal radius in kpc.
         r_h: float
             Influence radius in kpc.
+        psi_t_bar: array
+            Dimensionless negative potential at the tidal radius.
 
         Returns:
         -------
@@ -231,9 +268,7 @@ class BaseTDERate:
         _scaler = 2 * (r_t / r_h) ** 2
 
         return np.log(
-            _scaler
-            * ((r_t / r_h) ** (-1) - self._epsilon_bar_bins)
-            / self._Jc_sqr_bar_bins
+            _scaler * (psi_t_bar - self._epsilon_bar_bins) / self._Jc_sqr_bar_bins
         ) + np.where(
             q_bins > 1,
             -q_bins,
@@ -293,15 +328,17 @@ class BaseTDERate:
             else self._get_r_t_bins(self._m_s_bins, M_bh)
         )
 
+        _psi_t_bar_bins = self._get_psi_t_bar_bins(_r_t_bins / r_h)
+
         _r_g = G * M_bh / c**2
 
         _N_TDE_bins = []
-        for _r_t in _r_t_bins:
-            _q_bins = self._get_q_bins(M_bh, _r_t, r_h)
-            _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h)
+        for _r_t, _psi_t_bar in zip(_r_t_bins, _psi_t_bar_bins, strict=False):
+            _q_bins = self._get_q_bins(M_bh, _r_t, r_h, _psi_t_bar)
+            _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h, _psi_t_bar)
             _F_bar_bins = self._get_F_bar_bins(_ln_R0_bins, M_bh)
 
-            _F_bar_bins = np.nan_to_num(_F_bar_bins, nan=0.0)
+            _F_bar_bins[self._epsilon_bar_bins >= _psi_t_bar / 4] = 0
 
             _N_TDE_bins.append(
                 np.trapezoid(_F_bar_bins, self._epsilon_bar_bins)
@@ -335,11 +372,15 @@ class BaseTDERate:
             else self._get_r_t_bins(self._m_s_bins, M_bh)
         )
 
+        _psi_t_bar_bins = self._get_psi_t_bar_bins(_r_t_bins / r_h)
+
         _F_bar_bins = []
-        for _r_t in _r_t_bins:
-            _q_bins = self._get_q_bins(M_bh, _r_t, r_h)
-            _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h)
+        for _r_t, _psi_t_bar in zip(_r_t_bins, _psi_t_bar_bins, strict=False):
+            _q_bins = self._get_q_bins(M_bh, _r_t, r_h, _psi_t_bar)
+            _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h, _psi_t_bar)
             _F_bar_bins.append(self._get_F_bar_bins(_ln_R0_bins, M_bh))
+
+            _F_bar_bins[-1][self._epsilon_bar_bins >= _psi_t_bar / 4] = 0
 
         return self._m_norm * np.trapezoid(
             np.array(_F_bar_bins) * self._mass_func_bins.reshape(-1, 1),

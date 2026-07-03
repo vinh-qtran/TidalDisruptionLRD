@@ -34,7 +34,8 @@ class TDEGrid:
         m_s_max=2,
         r_env=None,
         profile_params={},  # noqa: B006
-        a_params={"M0": 3.16e8, "a0": 0.381, "alpha": 0.27},  # noqa: B006
+        r_half_mass_params={"M0": 3.16e8, "r0": 0.381, "alpha": 0.27},  # noqa: B006
+        r_half_mass_a_scaler=None,
     ):
         """
         Initialize the TDEGrid class, which computes TDE rates for a grid of black hole masses and stellar mass scalers.
@@ -59,12 +60,15 @@ class TDEGrid:
         profile_params : dict, optional
             The parameters for the profile function, with keys depending on the specific profile used. If not provided, an empty dictionary is used.
 
-        a_params : dict, optional
-            The parameters for the M-a relation, with keys "M0", "a0", and "alpha". If not provided, default values are used.
+        r_half_mass_params : dict, optional
+            The parameters for the M-r_half_mass relation, with keys "M0", "r0", and "alpha". If not provided, default values are used.
+        r_half_mass_a_scaler : float, optional
+            The scaling factor for the half-mass radius in units of the scale radius. If not provided, it is computed from the profile.
         """
 
         self._profile_params = profile_params
-        self._a_params = a_params
+        self._r_half_mass_params = r_half_mass_params
+        self._r_half_mass_a_scaler = r_half_mass_a_scaler
 
         self._profile = profile
         self._tde = tde
@@ -81,8 +85,8 @@ class TDEGrid:
 
         self.N_TDEs = np.vstack(_N_TDEs)
 
-    def _get_a(self, M_s, M0, a0, alpha):
-        return a0 * (M_s / M0) ** alpha
+    def _get_r_half_mass(self, M_s, M0, r0, alpha):
+        return r0 * (M_s / M0) ** alpha
 
     def _get_single_TDE_rates(self, M_s_scaler):
         _profile = self._profile(
@@ -96,7 +100,15 @@ class TDEGrid:
             show_progress=False,
         )
 
-        _as = self._get_a(self.M_bhs * M_s_scaler, **self._a_params)
+        _r_half_masses = self._get_r_half_mass(
+            self.M_bhs * M_s_scaler, **self._r_half_mass_params
+        )
+        _r_half_mass_a_scaler = (
+            self._r_half_mass_a_scaler
+            or _profile.get_2D_half_mass_radius() / _profile.a
+        )
+
+        _as = _r_half_masses / _r_half_mass_a_scaler
 
         _r_hs = _as / _profile.a
 
