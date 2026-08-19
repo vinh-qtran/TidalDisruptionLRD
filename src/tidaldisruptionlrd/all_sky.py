@@ -94,9 +94,9 @@ class TDEGrid:
             **self._profile_params,
             r_bin_min=1e-4,
             r_bin_max=1e6,
-            N_bins=1000,
+            N_bins=4000,
             reduce_factor=10,
-            N_trapz_bins=100,
+            N_trapz_bins=400,
             show_progress=False,
         )
 

@@ -133,9 +133,9 @@ class BaseTDERate:
         """
 
         return np.where(
-            r_t_bar_bins > 1e-2,
+            r_t_bar_bins > 1e-3,
             np.exp(self._log_log_psi_interp(np.log(r_t_bar_bins))),
-            1 / r_t_bar_bins,
+            1 / r_t_bar_bins - 1e3 + np.exp(self._log_log_psi_interp(np.log(1e-3))),
         )
 
     def _get_mass_function_bins(self, m_s_bins):
