@@ -19,6 +19,7 @@ class BaseProfile:
         reduce_factor=10,
         N_trapz_bins=1000,
         show_progress=True,
+        basic_profile_only=False,
     ):
         """
         Initialize the base profile class. The profile is defined in scale parameters,
@@ -43,9 +44,12 @@ class BaseProfile:
 
         show_progress: bool, optional
             Whether to show the progress bar for the profile calculations. Default is True.
+        basic_profile_only: bool, optional
+            Whether to only calculate the basic profiles (density, mass, and potential). Default is False.
         """
 
         self._show_progress = show_progress
+        self._basic_profile_only = basic_profile_only
 
         self._r_bin_min = r_bin_min
         self._r_bin_max = r_bin_max
@@ -58,7 +62,8 @@ class BaseProfile:
 
         self._get_base_profiles()
 
-        self._get_reduced_profiles()
+        if not self._basic_profile_only:
+            self._get_reduced_profiles()
 
     # BASE PROFILES CALCULATIONS
     def _get_stellar_rho_bins(self, r_bins):
@@ -258,9 +263,10 @@ class BaseProfile:
         self.mass_bins = self.stellar_mass_bins + 1
         self.phi_bins = self.stellar_phi_bins - 1 / self.r_bins
 
-        self.epsilon_bins, self.g_epsilon_bins = self._get_Eddington_bins(
-            self.stellar_rho_bins, self.phi_bins
-        )
+        if not self._basic_profile_only:
+            self.epsilon_bins, self.g_epsilon_bins = self._get_Eddington_bins(
+                self.stellar_rho_bins, self.phi_bins
+            )
 
     # SELF-CONSISTENCY CHECKS
     def reconstruct_stellar_rho_bins(self, psi_bins, epsilon_bins, g_epsilon_bins):
@@ -542,7 +548,7 @@ class DehnenProfile(BaseProfile):
             The scale radius in scale_length.
         """
 
-        return min(max(M_s ** (1 / (3 - self.gamma)) - 1, 1e-3), 1e3)
+        return M_s ** (1 / (3 - self.gamma)) - 1
 
     def _get_stellar_rho_bins(self, r_bins):
         """
@@ -704,7 +710,7 @@ class DehnenCuspProfile(BaseProfile):
             The scale radius in scale_length.
         """
 
-        return min(max(1 / r_h_bar, 1e-3), 1e3)
+        return 1 / r_h_bar  # min(max(1 / r_h_bar, 1e-4), 1e6)
 
     def _get_stellar_rho_bins(self, r_bins):
         """

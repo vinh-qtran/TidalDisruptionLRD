@@ -1,5 +1,6 @@
 import numpy as np
 from astropy import units as u
+from scipy.signal import find_peaks
 from tqdm import tqdm
 
 from tidaldisruptionlrd.constants import G, Rsun, c
@@ -116,6 +117,8 @@ class BaseTDERate:
         self._log_log_psi_interp = get_interp(
             np.log(self._r_bins), np.log(-self._phi_bins)
         )
+
+        self._epsilon_h = np.exp(self._log_log_psi_interp(0))
 
     def _get_psi_t_bar_bins(self, r_t_bar_bins):
         """
@@ -338,7 +341,14 @@ class BaseTDERate:
             _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h, _psi_t_bar)
             _F_bar_bins = self._get_F_bar_bins(_ln_R0_bins, M_bh)
 
-            _F_bar_bins[self._epsilon_bar_bins >= _psi_t_bar / 4] = 0
+            # _F_bar_bins[self._epsilon_bar_bins >= _psi_t_bar / 2] = 0
+            _F_bar_bins[np.isnan(_F_bar_bins)] = 0
+
+            _cut_off_idx = find_peaks(-_F_bar_bins)[0]
+            if len(_cut_off_idx) > 0:
+                _F_bar_bins[_cut_off_idx[-1] :] = 0
+            elif self._epsilon_h > _psi_t_bar / 3:
+                _F_bar_bins[:] = 0
 
             _N_TDE_bins.append(
                 np.trapezoid(_F_bar_bins, self._epsilon_bar_bins)
@@ -380,7 +390,8 @@ class BaseTDERate:
             _ln_R0_bins = self._get_ln_R0_bins(_q_bins, _r_t, r_h, _psi_t_bar)
             _F_bar_bins.append(self._get_F_bar_bins(_ln_R0_bins, M_bh))
 
-            _F_bar_bins[-1][self._epsilon_bar_bins >= _psi_t_bar / 4] = 0
+            # _F_bar_bins[-1][self._epsilon_bar_bins >= _psi_t_bar / 2] = 0
+            _F_bar_bins[-1][np.isnan(_F_bar_bins[-1])] = 0
 
         return self._m_norm * np.trapezoid(
             np.array(_F_bar_bins) * self._mass_func_bins.reshape(-1, 1),
