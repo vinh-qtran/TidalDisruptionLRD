@@ -1,5 +1,4 @@
 import csv
-import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -15,13 +14,7 @@ from tidaldisruptionlrd.constants import (
     z56_shell_volume,
 )
 
-# 1. Get the root string
-repo_root_str = subprocess.run(
-    ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True
-).stdout.strip()
-
-# 2. Convert to a Path object for easy joining
-repo_root = Path(repo_root_str)
+repo_root = Path(__file__).resolve().parents[2]
 
 
 class TDEGrid:
