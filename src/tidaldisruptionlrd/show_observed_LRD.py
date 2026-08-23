@@ -711,18 +711,18 @@ def plot_error_bar(ax, data_frame, color, marker):
             )
 
 
-def show_observed_LRD(ax, legend_loc):
-    for data in [
-        Yue_data,
-        Stone_data,
-        Ding_data,
-        # Maiolino_data_extra,
-        # Harikane_data_extra,
-        # Kocevski_data_23_extra,
-        # Kocevski_data_25_extra,
-        # Taylor_data_extra,
-    ]:
-        plot_error_bar(ax, data, "grey", "s")
+def show_observed_LRD(ax, legend_loc):  # noqa: ARG001
+    # for data in [
+    #     Yue_data,
+    #     Stone_data,
+    #     Ding_data,
+    #     # Maiolino_data_extra,
+    #     # Harikane_data_extra,
+    #     # Kocevski_data_23_extra,
+    #     # Kocevski_data_25_extra,
+    #     # Taylor_data_extra,
+    # ]:
+    #     plot_error_bar(ax, data, "grey", "s")
 
     for data in [
         Maiolino_data,
@@ -736,40 +736,40 @@ def show_observed_LRD(ax, legend_loc):
     ]:
         plot_error_bar(ax, data, "maroon", "o")
 
-    ax.errorbar(
-        [1],
-        [1],
-        [1],
-        [1],
-        capthick=2,
-        lw=2,
-        capsize=5,
-        ms=10,
-        color="maroon",
-        marker="o",
-        label="LRDs",
-    )
-    ax.errorbar(
-        [1],
-        [1],
-        [1],
-        [1],
-        capthick=2,
-        lw=2,
-        capsize=5,
-        ms=10,
-        color="grey",
-        marker="s",
-        label="Quasars",
-    )
+    # ax.errorbar(
+    #     [1],
+    #     [1],
+    #     [1],
+    #     [1],
+    #     capthick=2,
+    #     lw=2,
+    #     capsize=5,
+    #     ms=10,
+    #     color="maroon",
+    #     marker="o",
+    #     label="LRDs",
+    # )
+    # ax.errorbar(
+    #     [1],
+    #     [1],
+    #     [1],
+    #     [1],
+    #     capthick=2,
+    #     lw=2,
+    #     capsize=5,
+    #     ms=10,
+    #     color="grey",
+    #     marker="s",
+    #     label="Quasars",
+    # )
 
-    ax.legend(
-        loc=legend_loc,
-        ncol=1,
-        handletextpad=0.5,
-        handlelength=1.0,
-        columnspacing=0.5,
-        labelspacing=0.25,
-        # fontsize=24,
-    )
+    # ax.legend(
+    #     loc=legend_loc,
+    #     ncol=1,
+    #     handletextpad=0.5,
+    #     handlelength=1.0,
+    #     columnspacing=0.5,
+    #     labelspacing=0.25,
+    #     # fontsize=24,
+    # )
     # ax.add_artist(leg1)
