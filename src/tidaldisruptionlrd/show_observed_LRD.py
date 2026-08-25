@@ -41,11 +41,14 @@ Yue_yerr_upper = Yue_yerr_lower
 
 Yue_x_limit = [0, 0, 1, 0, 1, 1]
 
+Yue_y_limit = [0, 0, 0, 0, 0, 0]
+
 Yue_data["x_err_lower"] = Yue_xerr_lower
 Yue_data["x_err_upper"] = Yue_xerr_upper
 Yue_data["y_err_lower"] = Yue_yerr_lower
 Yue_data["y_err_upper"] = Yue_yerr_upper
 Yue_data["x_limit"] = Yue_x_limit
+Yue_data["y_limit"] = Yue_y_limit
 
 # Stone
 Stone_xerr_lower = [
@@ -60,11 +63,14 @@ Stone_yerr_lower = Stone_yerr_upper
 
 Stone_x_limit = [1] * len(Stone_data)
 
+Stone_y_limit = [0] * len(Stone_data)
+
 Stone_data["x_err_lower"] = Stone_xerr_lower
 Stone_data["x_err_upper"] = Stone_xerr_upper
 Stone_data["y_err_lower"] = Stone_yerr_lower
 Stone_data["y_err_upper"] = Stone_yerr_upper
 Stone_data["x_limit"] = Stone_x_limit
+Stone_data["y_limit"] = Stone_y_limit
 
 # Maiolino
 # Maiolino_xerr_lower = Maiolino_data[0] - [
@@ -115,6 +121,7 @@ Maiolino_data = pd.DataFrame(
         "y_err_lower": [0.07, 0.21, 0.11],
         "y_err_upper": [0.07, 0.18, 0.1],
         "x_limit": [0, 0, 0],
+        "y_limit": [0, 0, 0],
     }
 )
 
@@ -128,6 +135,7 @@ Maiolino_data_extra = pd.DataFrame(
         "y_err_lower": [0.08, 0.13, 0.33, 0.19, 0.25],
         "y_err_upper": [0.08, 0.11, 0.25, 0.16, 0.2],
         "x_limit": [0, 0, 1, 0, 0],
+        "y_limit": [0, 0, 0, 0, 0],
     }
 )
 
@@ -187,6 +195,7 @@ Harikane_data = pd.DataFrame(
         "y_err_lower": [0.14],
         "y_err_upper": [0.13],
         "x_limit": [0],
+        "y_limit": [0],
     }
 )
 
@@ -199,6 +208,7 @@ Harikane_data_extra = pd.DataFrame(
         "y_err_lower": [0.09, 0.14],
         "y_err_upper": [0.08, 0.13],
         "x_limit": [0, 0],
+        "y_limit": [0, 0],
     }
 )
 
@@ -212,6 +222,7 @@ Juodzbaliz_data = pd.DataFrame(
         "y_err_lower": [0.37],
         "y_err_upper": [0.38],
         "x_limit": [0],
+        "y_limit": [0],
     }
 )
 
@@ -231,6 +242,7 @@ Ding_data = pd.DataFrame(
         "y_err_lower": [0.4, 0.4],
         "y_err_upper": [0.4, 0.4],
         "x_limit": [0, 0],
+        "y_limit": [0, 0],
     }
 )
 
@@ -244,6 +256,7 @@ PerezGonzalez_data = pd.DataFrame(
         "y_err_lower": [0.3, 0.3, 0.4, 0.4],
         "y_err_upper": [0.3, 0.3, 0.4, 0.4],
         "x_limit": [1, 0, 0, 0],
+        "y_limit": [0, 0, 0, 0],
     }
 )
 
@@ -257,6 +270,7 @@ Kocevski_data_23 = pd.DataFrame(
         "y_err_lower": [0.13],
         "y_err_upper": [0.11],
         "x_limit": [0],
+        "y_limit": [0],
     }
 )
 
@@ -269,6 +283,7 @@ Kocevski_data_23_extra = pd.DataFrame(
         "y_err_lower": [0.16],
         "y_err_upper": [0.14],
         "x_limit": [1],
+        "y_limit": [0],
     }
 )
 
@@ -333,6 +348,7 @@ Kocevski_data_25 = pd.DataFrame(
             0.18,
         ],
         "x_limit": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "y_limit": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     }
 )
 
@@ -345,6 +361,7 @@ Kocevski_data_25_extra = pd.DataFrame(
         "y_err_lower": [0.22],
         "y_err_upper": [0.18],
         "x_limit": [1],
+        "y_limit": [0],
     }
 )
 
@@ -411,6 +428,7 @@ Taylor_data = pd.DataFrame(
             0.12,
         ],
         "x_limit": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "y_limit": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     }
 )
 
@@ -647,6 +665,39 @@ Taylor_data_extra = pd.DataFrame(
             0,
             1,
         ],
+        "y_limit": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ],
     }
 )
 
@@ -660,11 +711,52 @@ Rusakov_data = pd.DataFrame(
         "y_err_lower": [0.2, 0.07, 0.06, 0.14, 0.62, 0.06, 0.16, 0.62, 0.31, 0.24, 0.2],
         "y_err_upper": [1, 0.06, 0.05, 0.11, 1.11, 0.05, 0.14, 2.51, 0.18, 0.22, 0.26],
         "x_limit": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "y_limit": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     }
 )
 
+# Naidu
+Naidu_data = pd.DataFrame(
+    {
+        0: [8.3],
+        1: [5.1],
+        "x_err_lower": [0.4],
+        "x_err_upper": [0.2],
+        "y_err_lower": [0.4],
+        "y_err_upper": [0],
+        "x_limit": [0],
+        "y_limit": [1],
+    }
+)
 
-def plot_error_bar(ax, data_frame, color, marker):
+# Umeda
+Umedae_data_path = halo_stellar_folder + "Umeda+.csv"
+
+Umeda_data = pd.read_csv(Umedae_data_path, header=None).sort_values(by=0)
+
+Umeda_data["x_err_lower"] = np.full_like(Umeda_data[0], np.nan)
+Umeda_data["x_err_upper"] = np.full_like(Umeda_data[0], np.nan)
+Umeda_data["y_err_lower"] = np.full_like(Umeda_data[0], np.nan)
+Umeda_data["y_err_upper"] = np.full_like(Umeda_data[0], np.nan)
+Umeda_data["x_limit"] = np.zeros(len(Umeda_data[0]))
+Umeda_data["y_limit"] = np.zeros(len(Umeda_data[0]))
+
+# Getile
+Getile_data_path = halo_stellar_folder + "Getile+.csv"
+
+Getile_data = pd.read_csv(Getile_data_path, header=None).sort_values(by=0)
+
+Getile_data[1] + np.log10(3.6)
+
+Getile_data["x_err_lower"] = np.full_like(Getile_data[0], np.nan)
+Getile_data["x_err_upper"] = np.full_like(Getile_data[0], np.nan)
+Getile_data["y_err_lower"] = np.full_like(Getile_data[0], np.nan)
+Getile_data["y_err_upper"] = np.full_like(Getile_data[0], np.nan)
+Getile_data["x_limit"] = np.zeros(len(Getile_data[0]))
+Getile_data["y_limit"] = np.zeros(len(Getile_data[0]))
+
+
+def plot_error_bar(ax, data_frame, color, marker, zorder):
     x, y = 10 ** data_frame[0], 10 ** data_frame[1]
     xerr_lower, xerr_upper = (
         10 ** data_frame[0] - 10 ** (data_frame[0] - data_frame["x_err_lower"]),
@@ -676,53 +768,56 @@ def plot_error_bar(ax, data_frame, color, marker):
     )
 
     for i in range(len(data_frame)):
-        if not data_frame["x_limit"][i]:
-            ax.errorbar(
-                x[i],
-                y[i],
-                xerr=[[xerr_lower[i]], [xerr_upper[i]]],
-                yerr=[[yerr_lower[i]], [yerr_upper[i]]],
-                marker=marker,
-                ms=10,
-                color=color,
-                mec=color,
-                capthick=2,
-                lw=2,
-                capsize=5,
-                linestyle="none",
-                # label=name if i == 0 else "",
-            )
-        else:
-            ax.errorbar(
-                x[i],
-                y[i],
-                xerr=[[xerr_lower[i]], [xerr_upper[i]]],
-                yerr=[[yerr_lower[i]], [yerr_upper[i]]],
-                xuplims=True,
-                capthick=2,
-                lw=2,
-                capsize=5,
-                marker=marker,
-                ms=10,
-                color=color,
-                mec=color,
-                linestyle="none",
-                # label=name if i == 0 else "",
-            )
+        # if not data_frame["x_limit"][i]:
+        #     ax.errorbar(
+        #         x[i],
+        #         y[i],
+        #         xerr=[[xerr_lower[i]], [xerr_upper[i]]],
+        #         yerr=[[yerr_lower[i]], [yerr_upper[i]]],
+        #         marker=marker,
+        #         ms=10,
+        #         color=color,
+        #         mec=color,
+        #         capthick=2,
+        #         lw=2,
+        #         capsize=5,
+        #         linestyle="none",
+        #         # label=name if i == 0 else "",
+        #     )
+        # else:
+
+        ax.errorbar(
+            x[i],
+            y[i],
+            xerr=[[xerr_lower[i]], [xerr_upper[i]]],
+            yerr=[[yerr_lower[i]], [yerr_upper[i]]],
+            xuplims=data_frame["x_limit"][i],
+            uplims=data_frame["y_limit"][i],
+            capthick=2,
+            lw=2,
+            capsize=5,
+            marker=marker,
+            ms=10,
+            color=color,
+            mec=color,
+            linestyle="none",
+            # label=name if i == 0 else "",
+            zorder=zorder,
+        )
 
 
-def show_observed_LRD(ax, legend_loc):  # noqa: ARG001
-    # for data in [
-    #     Yue_data,
-    #     Stone_data,
-    #     Ding_data,
-    #     # Maiolino_data_extra,
-    #     # Harikane_data_extra,
-    #     # Kocevski_data_23_extra,
-    #     # Kocevski_data_25_extra,
-    #     # Taylor_data_extra,
-    # ]:
-    #     plot_error_bar(ax, data, "grey", "s")
+def show_observed_LRD(ax, legend_loc):
+    for data in [
+        Yue_data,
+        Stone_data,
+        Ding_data,
+        # Maiolino_data_extra,
+        # Harikane_data_extra,
+        # Kocevski_data_23_extra,
+        # Kocevski_data_25_extra,
+        # Taylor_data_extra,
+    ]:
+        plot_error_bar(ax, data, "grey", "d", zorder=-6)
 
     for data in [
         Maiolino_data,
@@ -732,44 +827,84 @@ def show_observed_LRD(ax, legend_loc):  # noqa: ARG001
         Kocevski_data_23,
         Kocevski_data_25,
         Taylor_data,
+    ]:
+        plot_error_bar(ax, data, "grey", "s", zorder=-5)
+
+    for data in [
         Rusakov_data,
     ]:
-        plot_error_bar(ax, data, "maroon", "o")
+        plot_error_bar(ax, data, "maroon", "s", zorder=-2)
 
-    # ax.errorbar(
-    #     [1],
-    #     [1],
-    #     [1],
-    #     [1],
-    #     capthick=2,
-    #     lw=2,
-    #     capsize=5,
-    #     ms=10,
+    for data in [
+        Naidu_data,
+    ]:
+        plot_error_bar(ax, data, "maroon", "^", zorder=-1)
+
+    for data in [
+        Umeda_data,
+    ]:
+        plot_error_bar(ax, data, "maroon", "o", zorder=-4)
+
+    for data in [
+        Getile_data,
+    ]:
+        plot_error_bar(ax, data, "maroon", "v", zorder=-3)
+
+    # ax.plot(
+    #     [], [], ".",
+    #     color="chocolate",
+    #     marker="s",
+    #     markersize=10,
+    #     label=r"LRDs (virial)",
+    # )
+    # ax.plot(
+    #     [], [], ".",
+    #     color="darkblue",
+    #     marker="d",
+    #     markersize=10,
+    #     label=r"LRDs (virial, electron-scattering)",
+    # )
+    # ax.plot(
+    #     [], [], ".",
     #     color="maroon",
     #     marker="o",
-    #     label="LRDs",
+    #     markersize=10,
+    #     label=r"LRDs (envelope, $\lambda_{\rm Edd} = 0.5$)",
     # )
-    # ax.errorbar(
-    #     [1],
-    #     [1],
-    #     [1],
-    #     [1],
-    #     capthick=2,
-    #     lw=2,
-    #     capsize=5,
-    #     ms=10,
-    #     color="grey",
-    #     marker="s",
-    #     label="Quasars",
+    # ax.plot(
+    #     [], [], ".",
+    #     color="darkgreen",
+    #     marker="v",
+    #     markersize=10,
+    #     label=r"LRDs (quasi-star, $M_\bullet / M_{\rm QS} = 0.36$)",
     # )
 
-    # ax.legend(
-    #     loc=legend_loc,
-    #     ncol=1,
-    #     handletextpad=0.5,
-    #     handlelength=1.0,
-    #     columnspacing=0.5,
-    #     labelspacing=0.25,
-    #     # fontsize=24,
-    # )
+    ax.plot(
+        [],
+        [],
+        ".",
+        color="grey",
+        marker="s",
+        markersize=10,
+        label=r"LRDs (high $M_\bullet$) + Quasars",
+    )
+    ax.plot(
+        [0],
+        [0],
+        ".",
+        color="maroon",
+        marker="s",
+        markersize=10,
+        label=r"LRDs (low $M_\bullet$)",
+    )
+
+    ax.legend(
+        loc=legend_loc,
+        ncol=1,
+        handletextpad=0.5,
+        handlelength=1.0,
+        columnspacing=0.5,
+        labelspacing=0.25,
+        fontsize=28,
+    )
     # ax.add_artist(leg1)
