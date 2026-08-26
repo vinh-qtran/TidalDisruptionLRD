@@ -276,6 +276,7 @@ class LRDNum:
 
 class AllSkyTDERate:
     def __init__(self, tde_grid, lrd_num_z4, lrd_num_z5=None):
+        self._fill_tde_grid(tde_grid)
         self._get_tde_interp(tde_grid)
 
         if lrd_num_z5 is None:
@@ -283,6 +284,28 @@ class AllSkyTDERate:
         self._get_lrd_num(lrd_num_z4, lrd_num_z5)
 
         self._get_all_sky_tde_rate()
+
+    def _fill_tde_grid(self, tde_grid):
+        _M_s_scalers = tde_grid.M_s_scalers
+        _M_bhs = tde_grid.M_bhs
+
+        _dlog_M_s_scaler = np.log10(_M_s_scalers[1]) - np.log10(_M_s_scalers[0])
+        _dlog_M_bh = np.log10(_M_bhs[1]) - np.log10(_M_bhs[0])
+
+        _diff = _dlog_M_s_scaler / _dlog_M_bh
+        _M_s_scaler_idx_step = np.round(1 / _diff).astype(int) if _diff < 1 else 1
+        _M_bh_idx_step = np.round(_diff).astype(int) if _diff > 1 else 1
+
+        _N_TDEs = tde_grid.N_TDEs
+
+        for _i, _M_s_scaler in enumerate(_M_s_scalers):
+            for _j, _M_bh in enumerate(_M_bhs):
+                if _N_TDEs[_i, _j] == 0:
+                    _j_ref = _j + _M_bh_idx_step
+                    _i_ref = _i - _M_s_scaler_idx_step
+
+                    if _j_ref < len(_M_bhs) and _i_ref >= 0:
+                        _N_TDEs[_i, _j] = _N_TDEs[_i_ref, _j_ref]
 
     def _get_tde_interp(self, tde_grid):
         self._tde_interp = RegularGridInterpolator(
