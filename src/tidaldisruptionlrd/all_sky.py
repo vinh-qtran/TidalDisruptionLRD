@@ -1,4 +1,5 @@
 import csv
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -155,12 +156,27 @@ def L25_logMs_from_logMbh(log_Mbh):
 
 
 class LRDNum:
+    """
+    Host population with scatter in M* at fixed M•: the number density is
+    defined on a grid in log M• (``BHMF_type``), and log M* is Gaussian about
+    the relation with width sigma_• / slope.
+    """
+
     _logMs_from_logMbh_funcs = {  # noqa: RUF012
         "KH13": KH13_logMs_from_logMbh,
         "RV15": RV15_logMs_from_logMbh,
         "G20": G20_logMs_from_logMbh,
         "P23": P23_logMs_from_logMbh,
         "L25": L25_logMs_from_logMbh,
+    }
+
+    # Intrinsic scatter of each relation in log M• at fixed M* (dex).
+    _log_Mbh_scatters = {  # noqa: RUF012
+        "KH13": 0.29,
+        "RV15": 0.55,
+        "G20": 0.79,
+        "P23": 0.69,
+        "L25": 0.97,
     }
 
     _log_Ms_scatters = {  # noqa: RUF012
@@ -179,6 +195,8 @@ class LRDNum:
         "Inayoshi24_z5_Unobscured": repo_root
         / "data/Inayoshi24/z5_Dashed_Unobscured.csv",
     }
+
+    row_variable = "log_Mbh"
 
     def __init__(self, log_Mbh_bins, delta_log_Ms_scaler, Ms_Mbh_type, BHMF_type):
 
@@ -218,6 +236,21 @@ class LRDNum:
 
         self.p_delta_log_Ms_bins = (
             norm.pdf(delta_log_Ms_scaler) / self._log_Ms_scatters[Ms_Mbh_type]
+        )
+
+        # Common 2D interface read by AllSkyTDERate (rows: log M•, cols: scatter).
+        _shape = (len(self.log_Mbh_bins), len(self.delta_log_Ms_bins))
+        self.log_Mbh_grid = np.broadcast_to(
+            np.asarray(self.log_Mbh_bins).reshape(-1, 1), _shape
+        ).copy()
+        self.log_Ms_grid = self.log_Ms_bins.reshape(-1, 1) + self.delta_log_Ms_bins
+        self.p_grid = np.broadcast_to(
+            self.p_delta_log_Ms_bins
+            * (self.delta_log_Ms_bins[1] - self.delta_log_Ms_bins[0]),
+            _shape,
+        ).copy()
+        self.row_number_density = self.BHMF_bins * (
+            self.log_Mbh_bins[1] - self.log_Mbh_bins[0]
         )
 
     def _read_Greene25_DF(self):
@@ -274,6 +307,77 @@ class LRDNum:
         return 10 ** np.interp(log_Mbh, _log_I24_BHMass, _log_I24_BHMF)
 
 
+class LRDNumScatterMbh:
+    """
+    Host population as described in the paper: the number density is
+    distributed in log M* over ``log_Ms_bins`` (e.g. 7-9), and log M• is
+    Gaussian about the relation at fixed M* with the relation's intrinsic
+    scatter sigma_• (in dex of M•).
+
+    Parameters
+    ----------
+    log_Ms_bins : array
+        Grid in log M* [M_sun]. The full number density is spread over this range.
+    delta_log_Mbh_scaler : array
+        Offsets in units of sigma_• (e.g. np.linspace(-5, 5, N)).
+    Ms_Mbh_type : str
+        One of "KH13", "RV15", "G20", "P23", "L25".
+    SMF_type : str
+        "uniform" (flat in log M*) or "gaussian" (same form as LRDNum's, in log M*).
+        Data-driven mass functions (Greene25, Inayoshi24) are defined in M•,
+        so use LRDNum for those.
+    """
+
+    row_variable = "log_Ms"
+
+    def __init__(self, log_Ms_bins, delta_log_Mbh_scaler, Ms_Mbh_type, SMF_type):
+        _logMs_from_logMbh = LRDNum._logMs_from_logMbh_funcs[Ms_Mbh_type]
+        # The relations are linear: log M* = c + s log M•  ->  invert exactly.
+        _c = _logMs_from_logMbh(0.0)
+        _s = _logMs_from_logMbh(1.0) - _c
+
+        self.log_Ms_bins = np.asarray(log_Ms_bins, dtype=float)
+        self.log_Mbh_bins = (self.log_Ms_bins - _c) / _s  # mean log M• at fixed M*
+
+        _sigma = LRDNum._log_Mbh_scatters[Ms_Mbh_type]
+        self.delta_log_Mbh_bins = np.asarray(delta_log_Mbh_scaler) * _sigma
+        self.p_delta_log_Mbh_bins = norm.pdf(delta_log_Mbh_scaler) / _sigma
+
+        if SMF_type == "uniform":
+            self.SMF_bins = np.full_like(self.log_Ms_bins, G25_number_density) / (
+                self.log_Ms_bins[-1] - self.log_Ms_bins[0]
+            )
+        elif SMF_type == "gaussian":
+            self.SMF_bins = (
+                norm.pdf(self.log_Ms_bins, loc=self.log_Ms_bins.mean(), scale=1)
+                * G25_number_density
+                / (norm.cdf(1) - norm.cdf(-1))
+            )
+        else:
+            raise ValueError(  # noqa: TRY003
+                f"SMF_type {SMF_type!r} not supported here; "  # noqa: EM102
+                "mass functions defined in M• should use LRDNum."
+            )
+
+        if Ms_Mbh_type == "L25":
+            self.SMF_bins /= 0.09
+
+        # Common 2D interface read by AllSkyTDERate (rows: log M*, cols: scatter).
+        _shape = (len(self.log_Ms_bins), len(self.delta_log_Mbh_bins))
+        self.log_Ms_grid = np.broadcast_to(
+            self.log_Ms_bins.reshape(-1, 1), _shape
+        ).copy()
+        self.log_Mbh_grid = self.log_Mbh_bins.reshape(-1, 1) + self.delta_log_Mbh_bins
+        self.p_grid = np.broadcast_to(
+            self.p_delta_log_Mbh_bins
+            * (self.delta_log_Mbh_bins[1] - self.delta_log_Mbh_bins[0]),
+            _shape,
+        ).copy()
+        self.row_number_density = self.SMF_bins * (
+            self.log_Ms_bins[1] - self.log_Ms_bins[0]
+        )
+
+
 class AllSkyTDERate:
     def __init__(self, tde_grid, lrd_num_z4, lrd_num_z5=None):
         self._fill_tde_grid(tde_grid)
@@ -316,63 +420,59 @@ class AllSkyTDERate:
         )
 
     def _get_lrd_num(self, lrd_num_z4, lrd_num_z5):
-        if np.equal(lrd_num_z4.log_Mbh_bins, lrd_num_z5.log_Mbh_bins).all():
-            self._log_Mbh_bins = lrd_num_z4.log_Mbh_bins
-        else:
+        if lrd_num_z4.row_variable != lrd_num_z5.row_variable:
             raise ValueError(  # noqa: TRY003
-                "log_Mbh_bins are not equal between the two LRD number objects"  # noqa: EM101
+                "The two LRD number objects use different scatter schemes"  # noqa: EM101
             )
 
-        if np.equal(lrd_num_z4.log_Ms_bins, lrd_num_z5.log_Ms_bins).all():
-            self._log_Ms_bins = lrd_num_z4.log_Ms_bins
-        else:
-            raise ValueError(  # noqa: TRY003
-                "log_Ms_bins are not equal between the two LRD number objects"  # noqa: EM101
-            )
+        for _name in ("log_Ms_grid", "log_Mbh_grid", "p_grid"):
+            if not np.array_equal(
+                getattr(lrd_num_z4, _name), getattr(lrd_num_z5, _name)
+            ):
+                raise ValueError(  # noqa: TRY003
+                    f"{_name} is not equal between the two LRD number objects"  # noqa: EM102
+                )
 
-        if np.equal(lrd_num_z4.delta_log_Ms_bins, lrd_num_z5.delta_log_Ms_bins).all():
-            self._delta_log_Ms_bins = lrd_num_z4.delta_log_Ms_bins
-        else:
-            raise ValueError(  # noqa: TRY003
-                "delta_log_Ms_bins are not equal between the two LRD number objects"  # noqa: EM101
-            )
+        self._row_variable = lrd_num_z4.row_variable
+        self._log_Ms_grid = lrd_num_z4.log_Ms_grid
+        self._log_Mbh_grid = lrd_num_z4.log_Mbh_grid
+        self._p_grid = lrd_num_z4.p_grid
 
-        if np.equal(
-            lrd_num_z4.p_delta_log_Ms_bins, lrd_num_z5.p_delta_log_Ms_bins
-        ).all():
-            self._p_delta_log_Ms_bins = lrd_num_z4.p_delta_log_Ms_bins
-        else:
-            raise ValueError(  # noqa: TRY003
-                "p_delta_log_Ms_bins are not equal between the two LRD number objects"  # noqa: EM101
-            )
-
-        self._BHMF_bins = (
-            lrd_num_z4.BHMF_bins * z45_shell_volume
-            + lrd_num_z5.BHMF_bins * z56_shell_volume
+        self._row_number_density = (
+            lrd_num_z4.row_number_density * z45_shell_volume
+            + lrd_num_z5.row_number_density * z56_shell_volume
         ) / (z45_shell_volume + z56_shell_volume)
 
     def _get_all_sky_tde_rate(self):
-        _log_Mbh = np.repeat(self._log_Mbh_bins, len(self._delta_log_Ms_bins)).reshape(
-            len(self._log_Mbh_bins), len(self._delta_log_Ms_bins)
-        )
-        _log_Ms = self._log_Ms_bins.reshape(-1, 1) + self._delta_log_Ms_bins
-
-        _log_Ms_scaler = _log_Ms - _log_Mbh
+        _log_Ms_scaler = self._log_Ms_grid - self._log_Mbh_grid
         _log_tde_rate = self._tde_interp(
-            (_log_Ms_scaler.flatten(), _log_Mbh.flatten())
-        ).reshape(_log_Mbh.shape)
+            (_log_Ms_scaler.flatten(), self._log_Mbh_grid.flatten())
+        ).reshape(self._log_Mbh_grid.shape)
 
-        self.tde_rate_Mbh_bins = np.nansum(
-            10**_log_tde_rate
-            * self._p_delta_log_Ms_bins.reshape(1, -1)
-            * (self._delta_log_Ms_bins[1] - self._delta_log_Ms_bins[0]),
-            axis=1,
+        # Mean rate per host in each row bin (rows are log M• for LRDNum,
+        # log M* for LRDNumScatterMbh).
+        self.tde_rate_bins = np.nansum(10**_log_tde_rate * self._p_grid, axis=1)
+        if self._row_variable == "log_Mbh":
+            self.tde_rate_Mbh_bins = self.tde_rate_bins
+        else:
+            self.tde_rate_Ms_bins = self.tde_rate_bins
+
+        # Report how much of the population falls outside the TDE grid; those
+        # cells are NaN and are silently dropped by nansum.
+        _weight = self._row_number_density.reshape(-1, 1) * self._p_grid
+        self.uncovered_weight_fraction = (
+            _weight[np.isnan(_log_tde_rate)].sum() / _weight.sum()
         )
+        if self.uncovered_weight_fraction > 1e-3:
+            warnings.warn(
+                f"{self.uncovered_weight_fraction:.1%} of the host population lies "
+                "outside the TDE grid (M_s_scalers x M_bhs) and is dropped from "
+                "the rate; extend the grid or truncate the scatter.",
+                stacklevel=2,
+            )
 
         self.all_sky_tde_rate = np.nansum(
-            self.tde_rate_Mbh_bins
-            * self._BHMF_bins
-            * (self._log_Mbh_bins[1] - self._log_Mbh_bins[0])
+            self.tde_rate_bins * self._row_number_density
         ) * (
             z45_shell_volume * z45_dilation_factor
             + z56_shell_volume * z56_dilation_factor
